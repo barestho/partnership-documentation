@@ -15,7 +15,8 @@
         "astro-build.astro-vscode",
         "unifiedjs.vscode-mdx",
         "YoavBls.pretty-ts-errors",
-        "ms-vscode.vscode-typescript-next"
+        "ms-vscode.vscode-typescript-next",
+        "github.vscode-github-actions"
       ]
     }
   }
