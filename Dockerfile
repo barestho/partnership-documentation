@@ -13,6 +13,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         git \
         curl \
         sudo \
+        openssh-client \
     && usermod -aG sudo node \
     && echo "%sudo  ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers 
 
