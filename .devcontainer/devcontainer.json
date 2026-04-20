@@ -12,7 +12,10 @@
       "extensions": [
         "mhutchie.git-graph",
         "ms-azuretools.vscode-docker",
-        "astro-build.astro-vscode"
+        "astro-build.astro-vscode",
+        "unifiedjs.vscode-mdx",
+        "YoavBls.pretty-ts-errors",
+        "ms-vscode.vscode-typescript-next"
       ]
     }
   }
