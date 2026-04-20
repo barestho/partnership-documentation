@@ -1,0 +1,10 @@
+services:
+  doc-dev:
+    build: 
+      context: ..
+      target: development
+
+    hostname: "partnership-documentation"
+
+    volumes:
+      - ../:/documentation
