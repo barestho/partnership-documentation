@@ -6,5 +6,8 @@ services:
 
     hostname: "partnership-documentation"
 
+    ports:
+      - 4321:4321
+
     volumes:
       - ../:/documentation
