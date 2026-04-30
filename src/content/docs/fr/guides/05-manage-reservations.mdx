@@ -33,17 +33,30 @@ POST /api/v1/partnership/restaurants/:restaurant_id/reservations/ HTTP/1.1
 Host: public.api.barestho.com
 Authorization: Basic <base64(uuid:token)>
 Content-Type: application/json
-
+```
+```json
 {
-  "date": "2025-06-15",
-  "time": "19:30",
-  "covers": 2,
-  "customer": {
-    "first_name": "Jean",
-    "last_name": "Dupont",
-    "email": "jean.dupont@email.com",
-    "phone": "+33612345678"
-  }
+  "id": 25,
+  "first_name": "Kristopher",
+  "last_name": "Weissnat",
+  "email": null,
+  "phone": null,
+  "start_time": "2026-05-12T12:00:00+02:00",
+  "duration": "02:00:00",
+  "adults": 3,
+  "children": 0,
+  "comment": null,
+  "cancelled": false,
+  "cancelled_at": null,
+  "confirmed": false,
+  "confirmed_at": null,
+  "confirmation_mode": "CONFIRMATION_MODE_ASYNCHRONOUS",
+  "arrived": false,
+  "arrived_at": null,
+  "no_show": false,
+  "no_show_at": null,
+  "language": "fr",
+  "metadata": null
 }
 ```
 <Aside type="caution">
