@@ -1,0 +1,81 @@
+---
+title: "Gérer les réservations"
+---
+import { Aside } from '@astrojs/starlight/components';
+
+
+## Périmètre d'accès
+
+Un partenaire n'a accès qu'aux réservations qu'il a lui-même créées via l'API. Les réservations issues d'autres canaux (formulaire Barestho, Google, etc.) ne sont pas visibles.
+
+---
+
+## Lister et créer des réservations
+
+Les réservations d'un restaurant sont accessibles via :
+
+```
+https://public.api.barestho.com/api/v1/partnership/restaurants/:restaurant_id/reservations/
+```
+
+### Lister les réservations
+
+```http
+GET /api/v1/partnership/restaurants/:restaurant_id/reservations/ HTTP/1.1
+Host: public.api.barestho.com
+Authorization: Basic <base64(uuid:token)>
+```
+
+### Créer une réservation
+
+```http
+POST /api/v1/partnership/restaurants/:restaurant_id/reservations/ HTTP/1.1
+Host: public.api.barestho.com
+Authorization: Basic <base64(uuid:token)>
+Content-Type: application/json
+
+{
+  "date": "2025-06-15",
+  "time": "19:30",
+  "covers": 2,
+  "customer": {
+    "first_name": "Jean",
+    "last_name": "Dupont",
+    "email": "jean.dupont@email.com",
+    "phone": "+33612345678"
+  }
+}
+```
+<Aside type="caution">
+Une réservation ne peut être créée que si le restaurant dispose de disponibilités pour le créneau demandé. En l'absence de disponibilité, l'API retournera une réponse `409 Conflict`.
+</Aside>
+
+---
+
+## Annuler une réservation
+
+Un partenaire peut annuler uniquement les réservations qu'il a créées :
+
+```http
+PATCH /api/v1/partnership/restaurants/:restaurant_id/reservations/:id/?action=cancel HTTP/1.1
+Host: public.api.barestho.com
+Authorization: Basic <base64(uuid:token)>
+```
+<Aside type="caution">
+Seules les réservations créées par le partenaire sont annulables via cette route.
+</Aside>
+---
+
+## Événements webhook
+
+Les événements suivants peuvent être reçus sur vos webhooks en lien avec vos réservations :
+
+| Événement | Déclencheur |
+|---|---|
+| `RESERVATION_CONFIRMED` | Le restaurant a manuellement confirmé la réservation |
+| `RESERVATION_MODIFIED` | La réservation a été modifiée par le restaurant ou le client |
+| `RESERVATION_CANCELLED` | La réservation a été annulée par le partenaire, le restaurant ou le client |
+
+<Aside type="note">
+Ces événements vous permettent de maintenir l'état de vos réservations en temps réel sans avoir à interroger l'API en continu.
+</Aside>
