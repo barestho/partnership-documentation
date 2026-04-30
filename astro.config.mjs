@@ -6,21 +6,46 @@ import starlight from '@astrojs/starlight';
 export default defineConfig({
 	integrations: [
 		starlight({
-			title: 'My Docs',
-			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/withastro/starlight' }],
+			title: {
+				en: 'Barestho Partnership',
+				fr: 'Partenariat Barestho',
+				nl: 'Partnerschap Barestho',
+			},
+			social: [
+				{ icon: 'github', label: 'GitHub', href: 'https://github.com/barestho', },
+				{ icon: 'facebook', label: 'Facebook', href: 'https://www.facebook.com/barestho/', },
+			],
 			sidebar: [
 				{
-					label: 'Guides',
-					items: [
-						// Each item here is one entry in the navigation menu.
-						{ label: 'Example Guide', slug: 'guides/example' },
-					],
+					label: "Accueil",
+					link: "/"
 				},
 				{
-					label: 'Reference',
-					autogenerate: { directory: 'reference' },
-				},
+					label: 'Guides',
+					translations: {
+						en: "Guides",
+						nl: "Gidsen",
+					},
+					autogenerate: { directory: 'guides' },
+				}
 			],
+
+			// Localization
+			defaultLocale: "fr",
+			locales: {
+				fr: {
+					label: "Français",
+					lang: "fr",
+				},
+				en: {
+					label: "English",
+					lang: "en",
+				},
+				nl: {
+					label: "Nederlands",
+					lang: "nl",
+				}
+			}
 		}),
 	],
 });
