@@ -1,0 +1,46 @@
+---
+title: Accès aux restaurants
+---
+import { Aside } from '@astrojs/starlight/components';
+
+## Prérequis
+
+Avant qu'un restaurant apparaisse dans votre liste, son responsable doit au préalable **autoriser explicitement votre accès** depuis le backoffice Barestho. Sans cet accord, le restaurant ne sera pas visible, même s'il est référencé sur la plateforme.
+
+## Lister les restaurants accessibles
+
+Une fois l'accord obtenu, vous pouvez récupérer la liste de vos restaurants accessibles via :
+
+```http
+GET /api/v1/partnership/restaurants/?limit=10&offset=0 HTTP/1.1
+Host: public.api.barestho.com
+Authorization: Basic <base64(uuid:token)>
+```
+
+**Réponse `200 OK` :**
+```json
+{
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 4,
+            "display_name": "Barestho Dev",
+            "schema_name": "barestho",
+            "address": "Boulevard Samain 67, 7000 Mons Belgium",
+            "website": "http://www.barestho.com",
+            "latitude": 50.4598685156642,
+            "longitude": 3.9279265707227755,
+            "timezone": "Europe/Brussels"
+        }
+    ]
+}
+```
+<Aside type="note">
+Cette liste ne retourne que les restaurants ayant activement accordé leur accès. Elle peut évoluer à tout moment si un restaurant révoque ou accorde de nouveaux droits.
+</Aside>
+
+<Aside type="caution">
+À ce stade, aucune opération d'écriture n'est disponible sur les restaurants. Cette endpoint est accessible en lecture seule.
+</Aside>
