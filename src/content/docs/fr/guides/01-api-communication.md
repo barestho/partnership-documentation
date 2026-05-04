@@ -1,5 +1,5 @@
 ---
-title: Communication avec l'API
+title: 💬 Communication avec l'API
 ---
 
 ## Authentification

@@ -18,6 +18,10 @@ export default defineConfig({
 			sidebar: [
 				{
 					label: "Accueil",
+					translations: {
+						en: "Home",
+						nl: "Home",
+					},
 					link: "/"
 				},
 				{
