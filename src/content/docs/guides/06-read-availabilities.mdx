@@ -1,3 +1,65 @@
 ---
-title: 🗓️ Read Availabilities
+title: 📅 Read Availabilities
 ---
+import { Aside } from '@astrojs/starlight/components';
+
+Understanding how Barestho structures its availability is essential for displaying the correct time slots to your users. The data is organized to reflect the actual real-time capacity per **Zone** of the establishment.
+
+## Data Structure
+
+The availability flow follows a top-down hierarchy: 
+**Date** → **Shifts** (Services) → **Zones** → **Capacity per party size**.
+
+---
+
+## Understanding the `availability` Object
+
+The `availability` object represents the distribution of free seats within the different zones of the restaurant (e.g., Main Dining Room, Terrace, Upstairs).
+
+```json
+"availability": {
+    "1": {  // Zone ID (e.g., "Indoor Dining")
+        "2": 6, // 6 tables for 2 people are available
+        "4": 4  // 4 tables for 4 people are available
+    },
+    "2": {  // Zone ID (e.g., "Terrace")
+        "2": 2  // Only 2 tables for 2 people available
+    }
+}
+```
+
+### Key Points to Remember:
+* **First-level keys (`"1"`, `"2"`)**: Correspond to the unique identifiers of the restaurant's zones.
+* **Second-level keys (`"2"`, `"4"`)**: Represent the number of people (party size).
+* **Values (`6`, `4`)**: Represent the number of tables/slots remaining for that specific configuration.
+
+---
+
+## Availability Indicators
+
+To build an accurate user interface, rely on these indicators:
+
+* **`has_some_availability_left`**: A quick status check. If `false`, there is no need to browse the zone details for this slot.
+* **`limit_reached`**: Indicates that the restaurant has reached its maximum reservation quota for this shift, even if there is physically still space in a zone.
+* **`last_bookable_sec`**: Unix timestamp limit. Past this time, the slot should be hidden from your interface (handling last-minute "cut-off").
+
+---
+
+## Recommended Display Logic
+
+For a smooth integration, we suggest the following logic:
+
+1.  **Slot Selection**: Iterate through the `shifts` and retrieve objects via their `from_hour` (e.g., "19:00:00").
+2.  **Filter by Party Size**: 
+    * If your user is looking for a table for **4 people**, check if the key `"4"` exists in any of the zones within the `availability` object.
+    * Sum the values if you want to display total availability, or segment by zone if you allow the user to choose their seating location.
+3.  **Time Validation**: Verify that the current time is before `last_bookable_sec`.
+4.  **Display**: Show the reservation button only if at least one zone can accommodate the requested party size.
+
+<Aside type="note">
+If a zone does not appear in the object for a given slot, it means it is either fully booked or closed for that specific service.
+</Aside>
+
+<Aside type="tip">
+**Optimization:** You do not need to manage "table joining" logic. The Barestho Partnership API already calculates if a table of 4 can be formed and provides the final result directly in the dictionary.
+</Aside>
