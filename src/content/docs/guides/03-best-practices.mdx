@@ -1,36 +1,36 @@
 ---
-title: 🛡️ Bonnes pratiques de sécurité
+title: 🛡️ Security Best Practices
 ---
 import { Aside } from '@astrojs/starlight/components';
 
-## Sécurité des identifiants
+## Credential Security
 
-### Clef API
+### API Key
 
-Votre token d'API est transmis en clair à chaque requête via l'en-tête `Authorization`. Il doit être traité avec le même niveau de soin qu'un mot de passe.
+Your API token is transmitted in plain text with every request via the `Authorization` header. It must be treated with the same level of care as a password.
 
-**Recommandations :**
-- Ne jamais le versionner dans un dépôt de code (Git ou autre)
-- Le stocker dans une variable d'environnement ou un gestionnaire de secrets (Vault, AWS Secrets Manager, etc.)
-- Ne jamais l'exposer côté client (navigateur, application mobile)
+**Recommendations:**
+- Never commit it to a version control system (Git or otherwise)
+- Store it in an environment variable or a secret manager (Vault, AWS Secrets Manager, etc.)
+- Never expose it on the client side (browser, mobile application)
 
 <Aside type="note">
-Barestho ne stocke pas vos tokens en clair : ils sont hashés de notre côté. En cas de perte, il n'est pas possible de le retrouver. Vous pouvez en demander un nouveau auprès de l'équipe Barestho à tout moment, sans interruption de service.
+Barestho does not store your tokens in plain text: they are hashed on our end. If lost, it is impossible to recover them. You can request a new one from the Barestho team at any time, without any service interruption.
 </Aside>
 
 <Aside type="tip">
-Il est possible de disposer de **plusieurs tokens d'accès** simultanément, ce qui permet par exemple de faire une rotation sans coupure.
+It is possible to have **multiple access tokens** simultaneously, which allows for rotation without downtime, for example.
 </Aside>
 
 ---
 
-### Token de webhook
+### Webhook Token
 
-L'`auth_token` qui est défini à la création d'un webhook est utilisé pour vérifier l'authenticité des requêtes reçues.
+The `auth_token` defined during the creation of a webhook is used to verify the authenticity of incoming requests.
 
-**Recommandations :**
-- Le stocker de manière sécurisée, au même titre que votre clef API
+**Recommendations:**
+- Store it securely, just as you would with your API key
 
 <Aside type="note">
-Barestho chiffre les tokens de webhook au repos.
+Barestho encrypts webhook tokens at rest.
 </Aside>

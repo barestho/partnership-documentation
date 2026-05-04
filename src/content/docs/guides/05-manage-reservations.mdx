@@ -1,24 +1,24 @@
 ---
-title: "📃 Gérer les réservations"
+title: "📃 Managing Reservations"
 ---
 import { Aside } from '@astrojs/starlight/components';
 
 
-## Périmètre d'accès
+## Access Scope
 
-Un partenaire n'a accès qu'aux réservations qu'il a lui-même créées via l'API. Les réservations issues d'autres canaux (formulaire Barestho, Google, etc.) ne sont pas visibles.
+A partner only has access to reservations they have personally created via the API. Reservations originating from other channels (Barestho form, Google, etc.) are not visible.
 
 ---
 
-## Lister et créer des réservations
+## List and Create Reservations
 
-Les réservations d'un restaurant sont accessibles via :
+Reservations for a restaurant are accessible via:
 
 ```
 https://public.api.barestho.com/api/v1/partnership/restaurants/:restaurant_id/reservations/
 ```
 
-### Lister les réservations
+### List Reservations
 
 ```http
 GET /api/v1/partnership/restaurants/:restaurant_id/reservations/ HTTP/1.1
@@ -26,7 +26,7 @@ Host: public.api.barestho.com
 Authorization: Basic <base64(uuid:token)>
 ```
 
-### Créer une réservation
+### Create a Reservation
 
 ```http
 POST /api/v1/partnership/restaurants/:restaurant_id/reservations/ HTTP/1.1
@@ -55,19 +55,19 @@ Content-Type: application/json
   "arrived_at": null,
   "no_show": false,
   "no_show_at": null,
-  "language": "fr",
+  "language": "en",
   "metadata": null
 }
 ```
 <Aside type="caution">
-Une réservation ne peut être créée que si le restaurant dispose de disponibilités pour le créneau demandé. En l'absence de disponibilité, l'API retournera une réponse `409 Conflict`.
+A reservation can only be created if the restaurant has availability for the requested time slot. If there is no availability, the API will return a `409 Conflict` response.
 </Aside>
 
 ---
 
-## Annuler une réservation
+## Cancel a Reservation
 
-Un partenaire peut annuler uniquement les réservations qu'il a créées :
+A partner can only cancel reservations they have created:
 
 ```http
 PATCH /api/v1/partnership/restaurants/:restaurant_id/reservations/:id/?action=cancel HTTP/1.1
@@ -75,20 +75,20 @@ Host: public.api.barestho.com
 Authorization: Basic <base64(uuid:token)>
 ```
 <Aside type="caution">
-Seules les réservations créées par le partenaire sont annulables via cette route.
+Only reservations created by the partner can be cancelled via this route.
 </Aside>
 ---
 
-## Événements webhook
+## Webhook Events
 
-Les événements suivants peuvent être reçus sur vos webhooks en lien avec vos réservations :
+The following events can be received on your webhooks regarding your reservations:
 
-| Événement | Déclencheur |
+| Event | Trigger |
 |---|---|
-| `RESERVATION_CONFIRMED` | Le restaurant a manuellement confirmé la réservation |
-| `RESERVATION_MODIFIED` | La réservation a été modifiée par le restaurant ou le client |
-| `RESERVATION_CANCELLED` | La réservation a été annulée par le partenaire, le restaurant ou le client |
+| `RESERVATION_CONFIRMED` | The restaurant has manually confirmed the reservation |
+| `RESERVATION_MODIFIED` | The reservation has been modified by the restaurant or the customer |
+| `RESERVATION_CANCELLED` | The reservation has been cancelled by the partner, the restaurant, or the customer |
 
 <Aside type="note">
-Ces événements vous permettent de maintenir l'état de vos réservations en temps réel sans avoir à interroger l'API en continu.
+These events allow you to maintain the status of your reservations in real-time without having to continuously poll the API.
 </Aside>

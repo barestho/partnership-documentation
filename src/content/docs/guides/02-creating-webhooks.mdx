@@ -1,50 +1,47 @@
 ---
-title: ✏️ Création de Webhooks
+title: ✏️ Creating Webhooks
 ---
 import { Aside } from '@astrojs/starlight/components';
 import { Code } from '@astrojs/starlight/components';
 
+## Webhook Management
 
-## Gestion des webhooks
-
-Les webhooks se gèrent via l'endpoint suivant, en utilisant vos identifiants partenaire :
+Webhooks are managed via the following endpoint, using your partner credentials:
 
 ```
 https://public.api.barestho.com/api/v1/partnership/webhooks/
 ```
 
-Consultez la référence API pour la liste complète des opérations disponibles (création, consultation, suppression).
+Refer to the API reference for the full list of available operations (create, retrieve, delete).
 
-## Sécurisation
+## Security
 
 <Aside type='caution'>
-La vérification de la signature est facultative mais fortement recommandée. 
-Ne pas l'implémenter expose votre système à des requêtes frauduleuses.
+Signature verification is optional but strongly recommended.  
+Not implementing it exposes your system to fraudulent requests.
 </Aside>
 
-Chaque requête émise vers votre webhook est signée par Barestho à l'aide 
-d'un [**HMAC-SHA256**](https://fr.wikipedia.org/wiki/HMAC) calculé à partir de votre `auth_token`, 
-de la charge utile de la requête ainsi que de l'heure actuelle sous la forme d'un *timestamp*. 
-L'`auth_token` est défini par le partenaire lors de la création du webhook.
+Each request sent to your webhook is signed by Barestho using an  
+[**HMAC-SHA256**](https://en.wikipedia.org/wiki/HMAC) computed from your `auth_token`,  
+the request payload, and the current time as a *timestamp*.  
+The `auth_token` is defined by the partner when creating the webhook.
 
-Les en-têtes suivants accompagnent chaque requête :
+The following headers are included with each request:
 
-| En-tête | Contenu |
+| Header | Content |
 |---|---|
-| `X-Webhook-Signature` | Signature HMAC-SHA256 |
-| `X-Webhook-Timestamp` | Horodatage de la requête (Unix) |
+| `X-Webhook-Signature` | HMAC-SHA256 signature |
+| `X-Webhook-Timestamp` | Request timestamp (Unix) |
 
-### Vérification de la signature
+### Signature Verification
 
-Vérification de la signature
-Pour valider qu'une requête provient bien de Barestho, reconstituez la signature comme suit :
+To validate that a request originates from Barestho, reconstruct the signature as follows:
 
-1. Récupérez l'horodatage depuis `X-Webhook-Timestamp`
-2. Sérialisez le corps de la requête en JSON sans espaces, avec les clefs triées alphabétiquement
-3. Construisez le message à signer : `{timestamp}.{json_sérialisé}`
-4. Calculez un HMAC-SHA256 de ce message en utilisant votre `auth_token` comme clef
-5. Préfixez le résultat de `sha256=` et comparez-le à `X-Webhook-Signature`
-
+1. Retrieve the timestamp from `X-Webhook-Timestamp`
+2. Serialize the request body to JSON without spaces, with keys sorted alphabetically
+3. Build the message to sign: `{timestamp}.{serialized_json}`
+4. Compute an HMAC-SHA256 of this message using your `auth_token` as the key
+5. Prefix the result with `sha256=` and compare it to `X-Webhook-Signature`
 
 <Code 
     code={`
