@@ -4,7 +4,7 @@ title: 💬 Communicating with the API
 
 ## Authentication
 
-The Barestho API uses [**HTTP Basic Auth**](https://en.wikipedia.org/wiki/Basic_access_authentication). Each request must include your credentials encoded in Base64 in the `Authorization` header:
+The Barestho Partnership API uses [**HTTP Basic Auth**](https://en.wikipedia.org/wiki/Basic_access_authentication). Each request must include your credentials encoded in Base64 in the `Authorization` header:
 
 - **Username**: your partner UUID
 - **Password**: your API token
