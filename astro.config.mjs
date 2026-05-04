@@ -10,15 +10,17 @@ export default defineConfig({
 		starlight({
 			title: {
 				en: 'Barestho Partnership',
-				fr: 'Partenariat Barestho',
-				nl: 'Partnerschap Barestho',
+				// fr: 'Partenariat Barestho',
+				// nl: 'Partnerschap Barestho',
 			},
 			plugins: [
 				starlightOpenAPI([
 					{
 						base: 'api',
 						schema: './schemas/openapi.yaml',
-						sidebar: { label: 'Référence API' },
+						sidebar: { 
+							label: 'API reference',
+						},
 					},
 				]),
 			],
@@ -47,20 +49,20 @@ export default defineConfig({
 			],
 
 			// Localization
-			defaultLocale: "fr",
+			defaultLocale: "root",
 			locales: {
-				fr: {
-					label: "Français",
-					lang: "fr",
-				},
-				en: {
+				root: {
 					label: "English",
 					lang: "en",
 				},
-				nl: {
-					label: "Nederlands",
-					lang: "nl",
-				}
+				// fr: {
+				// 	label: "Français",
+				// 	lang: "fr",
+				// },
+				// nl: {
+				// 	label: "Nederlands",
+				// 	lang: "nl",
+				// }
 			}
 		}),
 	],
