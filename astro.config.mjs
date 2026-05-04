@@ -8,6 +8,7 @@ import starlightOpenAPI, { openAPISidebarGroups } from 'starlight-openapi';
 export default defineConfig({
 	integrations: [
 		starlight({
+			favicon: './public/favicon.ico',
 			title: {
 				en: 'Barestho Partnership',
 				// fr: 'Partenariat Barestho',
