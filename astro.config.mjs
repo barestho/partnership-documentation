@@ -34,6 +34,9 @@ export default defineConfig({
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/barestho', },
 				{ icon: 'facebook', label: 'Facebook', href: 'https://www.facebook.com/barestho/', },
+				{ icon: 'youtube', label: 'Youtube', href: 'https://www.youtube.com/@Barestho', },
+				{ icon: 'linkedin', label: 'Linkedin', href: 'https://linkedin.com/company/barestho', },
+				{ icon: 'email', label: 'Contact email', href: 'mailto:contact@barestho.com', },
 			],
 			sidebar: [
 				{
