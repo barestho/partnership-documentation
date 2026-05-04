@@ -10,6 +10,7 @@ paths:
     get:
       operationId: restaurants_list
       description: ''
+      summary: 'List restaurants'
       tags:
       - api
       responses:
@@ -25,6 +26,7 @@ paths:
     get:
       operationId: restaurants_retrieve
       description: ''
+      summary: 'Retrieve a restaurant'
       parameters:
       - name: id
         in: path
@@ -45,6 +47,7 @@ paths:
     get:
       operationId: restaurants_availabilities_retrieve
       description: ''
+      summary: 'Retrieve a restaurant availabilities'
       parameters:
       - name: id
         in: path
@@ -65,6 +68,7 @@ paths:
     get:
       operationId: webhooks_list
       description: ''
+      summary: 'List webhooks'
       tags:
       - api
       responses:
@@ -79,6 +83,7 @@ paths:
     post:
       operationId: webhooks_create
       description: ''
+      summary: 'Create a webhook'
       tags:
       - api
       requestBody:
@@ -103,6 +108,7 @@ paths:
     get:
       operationId: webhooks_retrieve
       description: ''
+      summary: 'Retrieve a webhook'
       parameters:
       - name: id
         in: path
@@ -122,6 +128,7 @@ paths:
     put:
       operationId: webhooks_update
       description: ''
+      summary: 'Update a webhook'
       parameters:
       - name: id
         in: path
@@ -152,6 +159,7 @@ paths:
     patch:
       operationId: webhooks_partial_update
       description: ''
+      summary: 'Update partialy a webhook'
       parameters:
       - name: id
         in: path
@@ -182,6 +190,7 @@ paths:
     delete:
       operationId: webhooks_destroy
       description: ''
+      summary: 'Delete a webhook'
       parameters:
       - name: id
         in: path
@@ -198,6 +207,7 @@ paths:
     get:
       operationId: webhooks_auth_token_retrieve
       description: ''
+      summary: 'Retrieve a webhook auth token'
       parameters:
       - name: id
         in: path
@@ -217,6 +227,7 @@ paths:
     post:
       operationId: webhooks_auth_token_create
       description: ''
+      summary: 'Regenerate a webhook auth token'
       parameters:
       - name: id
         in: path
@@ -248,6 +259,7 @@ paths:
     get:
       operationId: restaurants_reservations_list
       description: ''
+      summary: 'List a restaurant reservations'
       parameters:
       - name: restaurant_pk
         in: path
@@ -269,6 +281,7 @@ paths:
     post:
       operationId: restaurants_reservations_create
       description: ''
+      summary: 'Create a restaurant reservation'
       parameters:
       - name: restaurant_pk
         in: path
@@ -300,6 +313,7 @@ paths:
     get:
       operationId: restaurants_reservations_retrieve
       description: ''
+      summary: 'Retrieve a restaurant reservation'
       parameters:
       - name: id
         in: path
@@ -325,6 +339,7 @@ paths:
     patch:
       operationId: restaurants_reservations_partial_update
       description: ''
+      summary: 'Update a restaurant reservation'
       parameters:
       - name: id
         in: path
@@ -362,6 +377,7 @@ paths:
     get:
       operationId: profile_list
       description: ''
+      summary: 'Retrieve the partner profile'
       tags:
       - api
       responses:
@@ -377,6 +393,7 @@ paths:
     patch:
       operationId: profile_partial_update
       description: ''
+      summary: 'Update the partner profile'
       tags:
       - api
       requestBody:
@@ -408,6 +425,7 @@ paths:
     post:
       operationId: webhooks_test_create
       description: ''
+      summary: 'Test a webhook'
       parameters:
       - name: id
         in: path
@@ -594,191 +612,6 @@ components:
           format: date-time
           nullable: true
         language:
-          enum:
-          - ab
-          - aa
-          - af
-          - ak
-          - sq
-          - am
-          - ar
-          - an
-          - hy
-          - as
-          - av
-          - ae
-          - ay
-          - az
-          - bm
-          - ba
-          - eu
-          - be
-          - bn
-          - bh
-          - bi
-          - bs
-          - br
-          - bg
-          - my
-          - ca
-          - ch
-          - ce
-          - ny
-          - zh
-          - cv
-          - kw
-          - co
-          - cr
-          - hr
-          - cs
-          - da
-          - dv
-          - nl
-          - dz
-          - en
-          - eo
-          - et
-          - ee
-          - fo
-          - fj
-          - fi
-          - fr
-          - ff
-          - gl
-          - ka
-          - de
-          - el
-          - gn
-          - gu
-          - ht
-          - ha
-          - he
-          - hz
-          - hi
-          - ho
-          - hu
-          - ia
-          - id
-          - ie
-          - ga
-          - ig
-          - ik
-          - io
-          - is
-          - it
-          - iu
-          - ja
-          - jv
-          - kl
-          - kn
-          - kr
-          - ks
-          - kk
-          - km
-          - ki
-          - rw
-          - ky
-          - kv
-          - kg
-          - ko
-          - ku
-          - kj
-          - la
-          - lb
-          - lg
-          - li
-          - ln
-          - lo
-          - lt
-          - lu
-          - lv
-          - gv
-          - mk
-          - mg
-          - ms
-          - ml
-          - mt
-          - mi
-          - mr
-          - mh
-          - mn
-          - na
-          - nv
-          - nd
-          - ne
-          - ng
-          - nb
-          - nn
-          - 'no'
-          - ii
-          - nr
-          - oc
-          - oj
-          - cu
-          - om
-          - or
-          - os
-          - pa
-          - pi
-          - fa
-          - pl
-          - ps
-          - pt
-          - qu
-          - rm
-          - rn
-          - ro
-          - ru
-          - sa
-          - sc
-          - sd
-          - se
-          - sm
-          - sg
-          - sr
-          - gd
-          - sn
-          - si
-          - sk
-          - sl
-          - so
-          - st
-          - es
-          - su
-          - sw
-          - ss
-          - sv
-          - ta
-          - te
-          - tg
-          - th
-          - ti
-          - bo
-          - tk
-          - tl
-          - tn
-          - to
-          - tr
-          - ts
-          - tt
-          - tw
-          - ty
-          - ug
-          - uk
-          - ur
-          - uz
-          - ve
-          - vi
-          - vo
-          - wa
-          - cy
-          - wo
-          - fy
-          - xh
-          - yi
-          - yo
-          - za
-          - zu
           type: string
         metadata:
           type: object
@@ -903,191 +736,6 @@ components:
           format: date-time
           nullable: true
         language:
-          enum:
-          - ab
-          - aa
-          - af
-          - ak
-          - sq
-          - am
-          - ar
-          - an
-          - hy
-          - as
-          - av
-          - ae
-          - ay
-          - az
-          - bm
-          - ba
-          - eu
-          - be
-          - bn
-          - bh
-          - bi
-          - bs
-          - br
-          - bg
-          - my
-          - ca
-          - ch
-          - ce
-          - ny
-          - zh
-          - cv
-          - kw
-          - co
-          - cr
-          - hr
-          - cs
-          - da
-          - dv
-          - nl
-          - dz
-          - en
-          - eo
-          - et
-          - ee
-          - fo
-          - fj
-          - fi
-          - fr
-          - ff
-          - gl
-          - ka
-          - de
-          - el
-          - gn
-          - gu
-          - ht
-          - ha
-          - he
-          - hz
-          - hi
-          - ho
-          - hu
-          - ia
-          - id
-          - ie
-          - ga
-          - ig
-          - ik
-          - io
-          - is
-          - it
-          - iu
-          - ja
-          - jv
-          - kl
-          - kn
-          - kr
-          - ks
-          - kk
-          - km
-          - ki
-          - rw
-          - ky
-          - kv
-          - kg
-          - ko
-          - ku
-          - kj
-          - la
-          - lb
-          - lg
-          - li
-          - ln
-          - lo
-          - lt
-          - lu
-          - lv
-          - gv
-          - mk
-          - mg
-          - ms
-          - ml
-          - mt
-          - mi
-          - mr
-          - mh
-          - mn
-          - na
-          - nv
-          - nd
-          - ne
-          - ng
-          - nb
-          - nn
-          - 'no'
-          - ii
-          - nr
-          - oc
-          - oj
-          - cu
-          - om
-          - or
-          - os
-          - pa
-          - pi
-          - fa
-          - pl
-          - ps
-          - pt
-          - qu
-          - rm
-          - rn
-          - ro
-          - ru
-          - sa
-          - sc
-          - sd
-          - se
-          - sm
-          - sg
-          - sr
-          - gd
-          - sn
-          - si
-          - sk
-          - sl
-          - so
-          - st
-          - es
-          - su
-          - sw
-          - ss
-          - sv
-          - ta
-          - te
-          - tg
-          - th
-          - ti
-          - bo
-          - tk
-          - tl
-          - tn
-          - to
-          - tr
-          - ts
-          - tt
-          - tw
-          - ty
-          - ug
-          - uk
-          - ur
-          - uz
-          - ve
-          - vi
-          - vo
-          - wa
-          - cy
-          - wo
-          - fy
-          - xh
-          - yi
-          - yo
-          - za
-          - zu
           type: string
         metadata:
           type: object
