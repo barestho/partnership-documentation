@@ -9,10 +9,17 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: {
-				en: 'Barestho Partnership',
+				en: '',
 				// fr: 'Partenariat Barestho',
 				// nl: 'Partnerschap Barestho',
 			},
+			logo: {
+				light: "./src/assets/logo-light.svg",
+				dark: "./src/assets/logo-dark.svg",
+			},
+			customCss: [
+				'./src/style/theme.css',
+			],
 			plugins: [
 				starlightOpenAPI([
 					{
