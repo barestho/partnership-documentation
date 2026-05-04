@@ -1,6 +1,8 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightOpenAPI, { openAPISidebarGroups } from 'starlight-openapi';
+
 
 // https://astro.build/config
 export default defineConfig({
@@ -11,6 +13,15 @@ export default defineConfig({
 				fr: 'Partenariat Barestho',
 				nl: 'Partnerschap Barestho',
 			},
+			plugins: [
+				starlightOpenAPI([
+					{
+						base: 'api',
+						schema: './schemas/openapi.yaml',
+						sidebar: { label: 'Référence API' },
+					},
+				]),
+			],
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/barestho', },
 				{ icon: 'facebook', label: 'Facebook', href: 'https://www.facebook.com/barestho/', },
@@ -31,7 +42,8 @@ export default defineConfig({
 						nl: "Gidsen",
 					},
 					autogenerate: { directory: 'guides' },
-				}
+				},
+				...openAPISidebarGroups,
 			],
 
 			// Localization

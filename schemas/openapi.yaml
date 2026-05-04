@@ -1,0 +1,1095 @@
+openapi: 3.0.3
+servers:
+- url: https://public.api.barestho.com/
+info:
+  title: 'Partner REST API reference'
+  version: v1
+  description: ''
+paths:
+  /api/v1/partnership/restaurants/:
+    get:
+      operationId: restaurants_list
+      description: ''
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PartnerRestaurant'
+          description: ''
+  /api/v1/partnership/restaurants/{id}/:
+    get:
+      operationId: restaurants_retrieve
+      description: ''
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerRestaurant'
+          description: ''
+  /api/v1/partnership/restaurants/{id}/availabilities/:
+    get:
+      operationId: restaurants_availabilities_retrieve
+      description: ''
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerRestaurant'
+          description: ''
+  /api/v1/partnership/webhooks/:
+    get:
+      operationId: webhooks_list
+      description: ''
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PartnerWebhook'
+          description: ''
+    post:
+      operationId: webhooks_create
+      description: ''
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerWebhook'
+          description: ''
+  /api/v1/partnership/webhooks/{id}/:
+    get:
+      operationId: webhooks_retrieve
+      description: ''
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerWebhook'
+          description: ''
+    put:
+      operationId: webhooks_update
+      description: ''
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerWebhook'
+          description: ''
+    patch:
+      operationId: webhooks_partial_update
+      description: ''
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPartnerWebhook'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPartnerWebhook'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPartnerWebhook'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatchedPartnerWebhook'
+          description: ''
+    delete:
+      operationId: webhooks_destroy
+      description: ''
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      tags:
+      - api
+      responses:
+        '204':
+          description: No response body
+  /api/v1/partnership/webhooks/{id}/auth-token/:
+    get:
+      operationId: webhooks_auth_token_retrieve
+      description: ''
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerWebhook'
+          description: ''
+    post:
+      operationId: webhooks_auth_token_create
+      description: ''
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerWebhook'
+          description: ''
+  /api/v1/partnership/restaurants/{restaurant_pk}/reservations/:
+    get:
+      operationId: restaurants_reservations_list
+      description: ''
+      parameters:
+      - name: restaurant_pk
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PartnerRestaurantReservation'
+          description: ''
+    post:
+      operationId: restaurants_reservations_create
+      description: ''
+      parameters:
+      - name: restaurant_pk
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerRestaurantReservation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PartnerRestaurantReservation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PartnerRestaurantReservation'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerRestaurantReservation'
+          description: ''
+  /api/v1/partnership/restaurants/{restaurant_pk}/reservations/{id}/:
+    get:
+      operationId: restaurants_reservations_retrieve
+      description: ''
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      - name: restaurant_pk
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerRestaurantReservation'
+          description: ''
+    patch:
+      operationId: restaurants_reservations_partial_update
+      description: ''
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      - name: restaurant_pk
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPartnerRestaurantReservation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPartnerRestaurantReservation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPartnerRestaurantReservation'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatchedPartnerRestaurantReservation'
+          description: ''
+  /api/v1/partnership/profile/:
+    get:
+      operationId: profile_list
+      description: ''
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  description: Unspecified response body
+          description: ''
+    patch:
+      operationId: profile_partial_update
+      description: ''
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+              description: Unspecified request body
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+              description: Unspecified request body
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+              description: Unspecified request body
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Unspecified response body
+          description: ''
+  /api/v1/partnership/webhooks/{id}/test/:
+    post:
+      operationId: webhooks_test_create
+      description: ''
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: ''
+        schema:
+          type: string
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerWebhook'
+          description: ''
+components:
+  # securitySchemes:
+  #   cookieAuth:
+  #     type: apiKey
+  #     in: cookie
+  #     name: Session
+  #   basicAuth:
+  #     type: http
+  #     scheme: basic
+  schemas:
+    PartnerRestaurant:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        display_name:
+          type: string
+          readOnly: true
+        schema_name:
+          type: string
+          maxLength: 63
+        address:
+          type: string
+          readOnly: true
+        website:
+          type: string
+          readOnly: true
+        latitude:
+          type: number
+          format: float
+          readOnly: true
+        longitude:
+          type: number
+          format: float
+          readOnly: true
+        timezone:
+          type: string
+          readOnly: true
+      required:
+      - schema_name
+    PartnerWebhook:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        url:
+          type: string
+          format: uri
+          maxLength: 500
+          pattern: "^(?:[a-z0-9\\.\\-\\+]*)://(?:\\S+(?::\\S*)?@)?(?:(?:25[0-5]|2[0-4]\\\
+            d|[0-1]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)){3}|\\[[0-9a-f:\\\
+            .]+\\]|([a-z\xA1-\uFFFF0-9](?:[a-z\xA1-\uFFFF0-9-]{0,61}[a-z\xA1-\uFFFF\
+            0-9])?(?:\\.(?!-)[a-z\xA1-\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\xA1\
+            -\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::\\d{2,5})?(?:[/?#][^\\\
+            s]*)?\\Z"
+        name:
+          type: string
+          nullable: true
+          maxLength: 125
+        is_enabled:
+          type: boolean
+        last_use_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_response_status_code:
+          type: integer
+          maximum: 32767
+          nullable: true
+          minimum: 0
+        last_response:
+          type: object
+          additionalProperties: {}
+          nullable: true
+        subscribed_events:
+          type: object
+          additionalProperties: {}
+          nullable: true
+      required:
+      - url
+    PartnerRestaurantReservation:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        first_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        last_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 254
+        phone:
+          type: string
+          nullable: true
+          maxLength: 128
+        start_time:
+          type: string
+          format: date-time
+        duration:
+          type: string
+          readOnly: true
+        adults:
+          type: integer
+          maximum: 50
+          minimum: 1
+        children:
+          type: integer
+          maximum: 50
+        comment:
+          type: string
+          nullable: true
+        cancelled:
+          type: boolean
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+        confirmed:
+          type: boolean
+        confirmed_at:
+          type: string
+          format: date-time
+          nullable: true
+        confirmation_mode:
+          enum:
+          - CONFIRMATION_MODE_SYNCHRONOUS
+          - CONFIRMATION_MODE_ASYNCHRONOUS
+          type: string
+        arrived:
+          type: boolean
+        arrived_at:
+          type: string
+          format: date-time
+          nullable: true
+        no_show:
+          type: boolean
+        no_show_at:
+          type: string
+          format: date-time
+          nullable: true
+        language:
+          enum:
+          - ab
+          - aa
+          - af
+          - ak
+          - sq
+          - am
+          - ar
+          - an
+          - hy
+          - as
+          - av
+          - ae
+          - ay
+          - az
+          - bm
+          - ba
+          - eu
+          - be
+          - bn
+          - bh
+          - bi
+          - bs
+          - br
+          - bg
+          - my
+          - ca
+          - ch
+          - ce
+          - ny
+          - zh
+          - cv
+          - kw
+          - co
+          - cr
+          - hr
+          - cs
+          - da
+          - dv
+          - nl
+          - dz
+          - en
+          - eo
+          - et
+          - ee
+          - fo
+          - fj
+          - fi
+          - fr
+          - ff
+          - gl
+          - ka
+          - de
+          - el
+          - gn
+          - gu
+          - ht
+          - ha
+          - he
+          - hz
+          - hi
+          - ho
+          - hu
+          - ia
+          - id
+          - ie
+          - ga
+          - ig
+          - ik
+          - io
+          - is
+          - it
+          - iu
+          - ja
+          - jv
+          - kl
+          - kn
+          - kr
+          - ks
+          - kk
+          - km
+          - ki
+          - rw
+          - ky
+          - kv
+          - kg
+          - ko
+          - ku
+          - kj
+          - la
+          - lb
+          - lg
+          - li
+          - ln
+          - lo
+          - lt
+          - lu
+          - lv
+          - gv
+          - mk
+          - mg
+          - ms
+          - ml
+          - mt
+          - mi
+          - mr
+          - mh
+          - mn
+          - na
+          - nv
+          - nd
+          - ne
+          - ng
+          - nb
+          - nn
+          - 'no'
+          - ii
+          - nr
+          - oc
+          - oj
+          - cu
+          - om
+          - or
+          - os
+          - pa
+          - pi
+          - fa
+          - pl
+          - ps
+          - pt
+          - qu
+          - rm
+          - rn
+          - ro
+          - ru
+          - sa
+          - sc
+          - sd
+          - se
+          - sm
+          - sg
+          - sr
+          - gd
+          - sn
+          - si
+          - sk
+          - sl
+          - so
+          - st
+          - es
+          - su
+          - sw
+          - ss
+          - sv
+          - ta
+          - te
+          - tg
+          - th
+          - ti
+          - bo
+          - tk
+          - tl
+          - tn
+          - to
+          - tr
+          - ts
+          - tt
+          - tw
+          - ty
+          - ug
+          - uk
+          - ur
+          - uz
+          - ve
+          - vi
+          - vo
+          - wa
+          - cy
+          - wo
+          - fy
+          - xh
+          - yi
+          - yo
+          - za
+          - zu
+          type: string
+        metadata:
+          type: object
+          additionalProperties: {}
+          nullable: true
+      required:
+      - start_time
+      - adults
+    PatchedPartnerWebhook:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        url:
+          type: string
+          format: uri
+          maxLength: 500
+          pattern: "^(?:[a-z0-9\\.\\-\\+]*)://(?:\\S+(?::\\S*)?@)?(?:(?:25[0-5]|2[0-4]\\\
+            d|[0-1]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)){3}|\\[[0-9a-f:\\\
+            .]+\\]|([a-z\xA1-\uFFFF0-9](?:[a-z\xA1-\uFFFF0-9-]{0,61}[a-z\xA1-\uFFFF\
+            0-9])?(?:\\.(?!-)[a-z\xA1-\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\xA1\
+            -\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::\\d{2,5})?(?:[/?#][^\\\
+            s]*)?\\Z"
+        name:
+          type: string
+          nullable: true
+          maxLength: 125
+        is_enabled:
+          type: boolean
+        last_use_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_response_status_code:
+          type: integer
+          maximum: 32767
+          nullable: true
+          minimum: 0
+        last_response:
+          type: object
+          additionalProperties: {}
+          nullable: true
+        subscribed_events:
+          type: object
+          additionalProperties: {}
+          nullable: true
+    PatchedPartnerRestaurantReservation:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        first_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        last_name:
+          type: string
+          nullable: true
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 254
+        phone:
+          type: string
+          nullable: true
+          maxLength: 128
+        start_time:
+          type: string
+          format: date-time
+        duration:
+          type: string
+          readOnly: true
+        adults:
+          type: integer
+          maximum: 50
+          minimum: 1
+        children:
+          type: integer
+          maximum: 50
+        comment:
+          type: string
+          nullable: true
+        cancelled:
+          type: boolean
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+        confirmed:
+          type: boolean
+        confirmed_at:
+          type: string
+          format: date-time
+          nullable: true
+        confirmation_mode:
+          enum:
+          - CONFIRMATION_MODE_SYNCHRONOUS
+          - CONFIRMATION_MODE_ASYNCHRONOUS
+          type: string
+        arrived:
+          type: boolean
+        arrived_at:
+          type: string
+          format: date-time
+          nullable: true
+        no_show:
+          type: boolean
+        no_show_at:
+          type: string
+          format: date-time
+          nullable: true
+        language:
+          enum:
+          - ab
+          - aa
+          - af
+          - ak
+          - sq
+          - am
+          - ar
+          - an
+          - hy
+          - as
+          - av
+          - ae
+          - ay
+          - az
+          - bm
+          - ba
+          - eu
+          - be
+          - bn
+          - bh
+          - bi
+          - bs
+          - br
+          - bg
+          - my
+          - ca
+          - ch
+          - ce
+          - ny
+          - zh
+          - cv
+          - kw
+          - co
+          - cr
+          - hr
+          - cs
+          - da
+          - dv
+          - nl
+          - dz
+          - en
+          - eo
+          - et
+          - ee
+          - fo
+          - fj
+          - fi
+          - fr
+          - ff
+          - gl
+          - ka
+          - de
+          - el
+          - gn
+          - gu
+          - ht
+          - ha
+          - he
+          - hz
+          - hi
+          - ho
+          - hu
+          - ia
+          - id
+          - ie
+          - ga
+          - ig
+          - ik
+          - io
+          - is
+          - it
+          - iu
+          - ja
+          - jv
+          - kl
+          - kn
+          - kr
+          - ks
+          - kk
+          - km
+          - ki
+          - rw
+          - ky
+          - kv
+          - kg
+          - ko
+          - ku
+          - kj
+          - la
+          - lb
+          - lg
+          - li
+          - ln
+          - lo
+          - lt
+          - lu
+          - lv
+          - gv
+          - mk
+          - mg
+          - ms
+          - ml
+          - mt
+          - mi
+          - mr
+          - mh
+          - mn
+          - na
+          - nv
+          - nd
+          - ne
+          - ng
+          - nb
+          - nn
+          - 'no'
+          - ii
+          - nr
+          - oc
+          - oj
+          - cu
+          - om
+          - or
+          - os
+          - pa
+          - pi
+          - fa
+          - pl
+          - ps
+          - pt
+          - qu
+          - rm
+          - rn
+          - ro
+          - ru
+          - sa
+          - sc
+          - sd
+          - se
+          - sm
+          - sg
+          - sr
+          - gd
+          - sn
+          - si
+          - sk
+          - sl
+          - so
+          - st
+          - es
+          - su
+          - sw
+          - ss
+          - sv
+          - ta
+          - te
+          - tg
+          - th
+          - ti
+          - bo
+          - tk
+          - tl
+          - tn
+          - to
+          - tr
+          - ts
+          - tt
+          - tw
+          - ty
+          - ug
+          - uk
+          - ur
+          - uz
+          - ve
+          - vi
+          - vo
+          - wa
+          - cy
+          - wo
+          - fy
+          - xh
+          - yi
+          - yo
+          - za
+          - zu
+          type: string
+        metadata:
+          type: object
+          additionalProperties: {}
+          nullable: true
