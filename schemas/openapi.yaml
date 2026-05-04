@@ -1,296 +1,166 @@
 openapi: 3.0.3
 servers:
-- url: https://public.api.barestho.com/
+  - url: https://public.api.barestho.com/
 info:
-  title: 'Partner REST API reference'
+  title: Partner REST API reference
   version: v1
-  description: ''
+  description: >
+    The Barestho Partner API allows third-party partners to manage restaurants,
+    reservations, and webhook integrations on behalf of their customers.
+
+    All endpoints are scoped under `/api/v1/partnership/` and require partner-level
+    authentication. Partners can list and inspect the restaurants they have access to,
+    create and manage table reservations on behalf of those restaurants, and subscribe
+    to real-time events via webhooks.
+
+    **Base URL:** `https://public.api.barestho.com/`
+
+    **Versioning:** The current stable version is `v1`. Breaking changes will result
+    in a new version prefix.
+
+    **Authentication:** All endpoints require HTTP Basic Authentication.
+    Credentials are formed by concatenating your partner UUID and API token separated
+    by a colon (`uuid:api_token`), then Base64-encoding the result.
+
+    ```
+    Authorization: Basic Base64(uuid:api_token)
+    ```
+
+    Your UUID and API token are provided during partner onboarding. Keep them secret
+    and never expose them in client-side code or public repositories.
+
+# Applies Basic Auth to every endpoint by default.
+# Individual operations may override this if needed.
+security:
+  - basicAuth: []
+
 paths:
+  # ---------------------------------------------------------------------------
+  # Restaurants
+  # ---------------------------------------------------------------------------
   /api/v1/partnership/restaurants/:
     get:
       operationId: restaurants_list
-      description: ''
-      summary: 'List restaurants'
+      summary: List restaurants
+      description: >
+        Returns all restaurants accessible to the authenticated partner.
+        Use this endpoint to discover which restaurants are linked to your
+        partner account before querying their reservations or availabilities.
       tags:
-      - api
+        - Restaurants
       responses:
         '200':
+          description: A list of restaurants associated with the partner account.
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/PartnerRestaurant'
-          description: ''
+
   /api/v1/partnership/restaurants/{id}/:
     get:
       operationId: restaurants_retrieve
-      description: ''
-      summary: 'Retrieve a restaurant'
+      summary: Retrieve a restaurant
+      description: >
+        Returns the full details of a single restaurant identified by its unique ID.
+        Useful for refreshing cached restaurant data or retrieving location and
+        timezone information before booking a reservation.
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the restaurant.
+          schema:
+            type: string
       tags:
-      - api
+        - Restaurants
       responses:
         '200':
+          description: The requested restaurant object.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PartnerRestaurant'
-          description: ''
+
   /api/v1/partnership/restaurants/{id}/availabilities/:
     get:
       operationId: restaurants_availabilities_retrieve
-      description: ''
-      summary: 'Retrieve a restaurant availabilities'
+      summary: Retrieve restaurant availabilities
+      description: >
+        Returns the booking availability slots for the given restaurant.
+        Partners should query this endpoint before creating a reservation to ensure
+        the desired time slot is open. The response follows the same shape as
+        `PartnerRestaurant` and may include time-slot metadata depending on
+        the restaurant's configuration.
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the restaurant whose availabilities are requested.
+          schema:
+            type: string
       tags:
-      - api
+        - Restaurants
       responses:
         '200':
+          description: Availability information for the specified restaurant.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PartnerRestaurant'
-          description: ''
-  /api/v1/partnership/webhooks/:
-    get:
-      operationId: webhooks_list
-      description: ''
-      summary: 'List webhooks'
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/PartnerWebhook'
-          description: ''
-    post:
-      operationId: webhooks_create
-      description: ''
-      summary: 'Create a webhook'
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PartnerWebhook'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PartnerWebhook'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PartnerWebhook'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PartnerWebhook'
-          description: ''
-  /api/v1/partnership/webhooks/{id}/:
-    get:
-      operationId: webhooks_retrieve
-      description: ''
-      summary: 'Retrieve a webhook'
-      parameters:
-      - name: id
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PartnerWebhook'
-          description: ''
-    put:
-      operationId: webhooks_update
-      description: ''
-      summary: 'Update a webhook'
-      parameters:
-      - name: id
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PartnerWebhook'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PartnerWebhook'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PartnerWebhook'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PartnerWebhook'
-          description: ''
-    patch:
-      operationId: webhooks_partial_update
-      description: ''
-      summary: 'Update partialy a webhook'
-      parameters:
-      - name: id
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedPartnerWebhook'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedPartnerWebhook'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedPartnerWebhook'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PatchedPartnerWebhook'
-          description: ''
-    delete:
-      operationId: webhooks_destroy
-      description: ''
-      summary: 'Delete a webhook'
-      parameters:
-      - name: id
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
-      tags:
-      - api
-      responses:
-        '204':
-          description: No response body
-  /api/v1/partnership/webhooks/{id}/auth-token/:
-    get:
-      operationId: webhooks_auth_token_retrieve
-      description: ''
-      summary: 'Retrieve a webhook auth token'
-      parameters:
-      - name: id
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PartnerWebhook'
-          description: ''
-    post:
-      operationId: webhooks_auth_token_create
-      description: ''
-      summary: 'Regenerate a webhook auth token'
-      parameters:
-      - name: id
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PartnerWebhook'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PartnerWebhook'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PartnerWebhook'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PartnerWebhook'
-          description: ''
+
+  # ---------------------------------------------------------------------------
+  # Reservations
+  # ---------------------------------------------------------------------------
   /api/v1/partnership/restaurants/{restaurant_pk}/reservations/:
     get:
       operationId: restaurants_reservations_list
-      description: ''
-      summary: 'List a restaurant reservations'
+      summary: List a restaurant's reservations
+      description: >
+        Returns all reservations for the specified restaurant that are accessible
+        to the authenticated partner. Results include reservations in all states
+        (pending, confirmed, cancelled, no-show, etc.).
       parameters:
-      - name: restaurant_pk
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
+        - name: restaurant_pk
+          in: path
+          required: true
+          description: The unique identifier of the restaurant whose reservations are listed.
+          schema:
+            type: string
       tags:
-      - api
+        - Reservations
       responses:
         '200':
+          description: A list of reservations for the specified restaurant.
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/PartnerRestaurantReservation'
-          description: ''
+
     post:
       operationId: restaurants_reservations_create
-      description: ''
-      summary: 'Create a restaurant reservation'
+      summary: Create a restaurant reservation
+      description: >
+        Creates a new reservation for a guest at the specified restaurant.
+        At minimum you must provide `start_time` and `adults`. The `confirmation_mode`
+        field determines whether the reservation is confirmed immediately
+        (`CONFIRMATION_MODE_SYNCHRONOUS`) or requires an asynchronous approval step
+        (`CONFIRMATION_MODE_ASYNCHRONOUS`).
+
+        A webhook event is emitted after a successful creation if the restaurant has
+        an active webhook subscription for reservation events.
       parameters:
-      - name: restaurant_pk
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
+        - name: restaurant_pk
+          in: path
+          required: true
+          description: The unique identifier of the restaurant where the reservation is to be created.
+          schema:
+            type: string
       tags:
-      - api
+        - Reservations
       requestBody:
         content:
           application/json:
@@ -304,57 +174,70 @@ paths:
               $ref: '#/components/schemas/PartnerRestaurantReservation'
       responses:
         '200':
+          description: The newly created reservation object.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PartnerRestaurantReservation'
-          description: ''
+
   /api/v1/partnership/restaurants/{restaurant_pk}/reservations/{id}/:
     get:
       operationId: restaurants_reservations_retrieve
-      description: ''
-      summary: 'Retrieve a restaurant reservation'
+      summary: Retrieve a restaurant reservation
+      description: >
+        Returns the full details of a single reservation identified by its ID
+        within the given restaurant. Use this endpoint to poll the current state
+        of a reservation (e.g. to check whether an asynchronous confirmation
+        has been processed).
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
-      - name: restaurant_pk
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the reservation.
+          schema:
+            type: string
+        - name: restaurant_pk
+          in: path
+          required: true
+          description: The unique identifier of the restaurant that owns the reservation.
+          schema:
+            type: string
       tags:
-      - api
+        - Reservations
       responses:
         '200':
+          description: The requested reservation object.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PartnerRestaurantReservation'
-          description: ''
+
     patch:
       operationId: restaurants_reservations_partial_update
-      description: ''
-      summary: 'Update a restaurant reservation'
+      summary: Update a restaurant reservation
+      description: >
+        Partially updates a reservation. Only the fields included in the request body
+        are modified; all other fields retain their current values.
+
+        Common use cases include cancelling a reservation (set `cancelled` to `true`),
+        marking a guest as arrived (set `arrived` to `true`), or recording a no-show
+        (set `no_show` to `true`). Timestamps such as `cancelled_at` and `arrived_at`
+        are set automatically by the server when the corresponding boolean flag changes.
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
-      - name: restaurant_pk
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the reservation to update.
+          schema:
+            type: string
+        - name: restaurant_pk
+          in: path
+          required: true
+          description: The unique identifier of the restaurant that owns the reservation.
+          schema:
+            type: string
       tags:
-      - api
+        - Reservations
       requestBody:
         content:
           application/json:
@@ -368,73 +251,105 @@ paths:
               $ref: '#/components/schemas/PatchedPartnerRestaurantReservation'
       responses:
         '200':
+          description: The updated reservation object.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PatchedPartnerRestaurantReservation'
-          description: ''
+
+  # ---------------------------------------------------------------------------
+  # Partner Profile
+  # ---------------------------------------------------------------------------
   /api/v1/partnership/profile/:
     get:
       operationId: profile_list
-      description: ''
-      summary: 'Retrieve the partner profile'
+      summary: Retrieve the partner profile
+      description: >
+        Returns the profile information of the currently authenticated partner.
+        This may include contact details, branding settings, and configuration
+        options specific to your integration.
       tags:
-      - api
+        - Profile
       responses:
         '200':
+          description: The partner profile data as a list of profile objects.
           content:
             application/json:
               schema:
                 type: array
                 items:
                   type: object
-                  description: Unspecified response body
-          description: ''
+                  description: Partner profile attributes. Shape varies per partner configuration.
+
     patch:
       operationId: profile_partial_update
-      description: ''
-      summary: 'Update the partner profile'
+      summary: Update the partner profile
+      description: >
+        Partially updates the authenticated partner's profile. Only the fields
+        present in the request body will be modified.
       tags:
-      - api
+        - Profile
       requestBody:
         content:
           application/json:
             schema:
               type: object
               additionalProperties: {}
-              description: Unspecified request body
+              description: >
+                Partial partner profile payload. Send only the fields you wish to update.
           application/x-www-form-urlencoded:
             schema:
               type: object
               additionalProperties: {}
-              description: Unspecified request body
+              description: Partial partner profile payload (form-encoded).
           multipart/form-data:
             schema:
               type: object
               additionalProperties: {}
-              description: Unspecified request body
+              description: Partial partner profile payload (multipart form).
       responses:
         '200':
+          description: The updated partner profile.
           content:
             application/json:
               schema:
                 type: object
-                description: Unspecified response body
-          description: ''
-  /api/v1/partnership/webhooks/{id}/test/:
-    post:
-      operationId: webhooks_test_create
-      description: ''
-      summary: 'Test a webhook'
-      parameters:
-      - name: id
-        in: path
-        required: true
-        description: ''
-        schema:
-          type: string
+                description: Updated partner profile attributes.
+
+  # ---------------------------------------------------------------------------
+  # Webhooks
+  # ---------------------------------------------------------------------------
+  /api/v1/partnership/webhooks/:
+    get:
+      operationId: webhooks_list
+      summary: List webhooks
+      description: >
+        Returns all webhooks registered under the authenticated partner account.
+        Each webhook defines a target URL and the set of events it subscribes to.
       tags:
-      - api
+        - Webhooks
+      responses:
+        '200':
+          description: A list of webhook configurations for the partner.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PartnerWebhook'
+
+    post:
+      operationId: webhooks_create
+      summary: Create a webhook
+      description: >
+        Registers a new webhook endpoint for the partner. The provided `url` must be
+        a publicly reachable HTTPS endpoint that can receive POST requests. Use
+        `subscribed_events` to specify which event types should trigger a delivery.
+
+        After creation, use the `/test/` sub-resource to send a test payload and
+        verify connectivity before going live.
+      tags:
+        - Webhooks
       requestBody:
         content:
           application/json:
@@ -448,296 +363,710 @@ paths:
               $ref: '#/components/schemas/PartnerWebhook'
       responses:
         '200':
+          description: The newly created webhook object, including its generated ID and auth token details.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PartnerWebhook'
-          description: ''
+
+  /api/v1/partnership/webhooks/{id}/:
+    get:
+      operationId: webhooks_retrieve
+      summary: Retrieve a webhook
+      description: >
+        Returns the full configuration of a single webhook, including its current
+        enabled state, last delivery timestamp, and the HTTP status code returned
+        by the target endpoint on its most recent invocation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the webhook.
+          schema:
+            type: string
+      tags:
+        - Webhooks
+      responses:
+        '200':
+          description: The requested webhook configuration object.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerWebhook'
+
+    put:
+      operationId: webhooks_update
+      summary: Update a webhook
+      description: >
+        Fully replaces a webhook configuration. All writable fields must be provided;
+        omitted fields will be reset to their default values. Prefer `PATCH` if you
+        only need to change a subset of fields.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the webhook to replace.
+          schema:
+            type: string
+      tags:
+        - Webhooks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+      responses:
+        '200':
+          description: The updated webhook object after full replacement.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerWebhook'
+
+    patch:
+      operationId: webhooks_partial_update
+      summary: Partially update a webhook
+      description: >
+        Partially updates a webhook configuration. Only the fields included in the
+        request body are modified. Useful for toggling `is_enabled` or updating
+        the `subscribed_events` map without resending the full object.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the webhook to partially update.
+          schema:
+            type: string
+      tags:
+        - Webhooks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPartnerWebhook'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPartnerWebhook'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPartnerWebhook'
+      responses:
+        '200':
+          description: The webhook object after the partial update.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatchedPartnerWebhook'
+
+    delete:
+      operationId: webhooks_destroy
+      summary: Delete a webhook
+      description: >
+        Permanently removes the specified webhook. After deletion, no further event
+        deliveries will be attempted to the associated URL. This action is irreversible;
+        a new webhook must be registered if deliveries are required again.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the webhook to delete.
+          schema:
+            type: string
+      tags:
+        - Webhooks
+      responses:
+        '204':
+          description: The webhook was deleted successfully. No response body is returned.
+
+  /api/v1/partnership/webhooks/{id}/auth-token/:
+    get:
+      operationId: webhooks_auth_token_retrieve
+      summary: Retrieve a webhook auth token
+      description: >
+        Returns the current authentication token associated with the specified webhook.
+        This token is included in outgoing webhook request headers so your server can
+        verify that a delivery originated from Barestho. Keep this value secret.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the webhook.
+          schema:
+            type: string
+      tags:
+        - Webhooks
+      responses:
+        '200':
+          description: The webhook object including the current auth token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerWebhook'
+
+    post:
+      operationId: webhooks_auth_token_create
+      summary: Regenerate a webhook auth token
+      description: >
+        Issues a new authentication token for the specified webhook and invalidates
+        the previous one. Use this endpoint if you suspect the current token has been
+        compromised. After regeneration, update your server's verification logic with
+        the new token before the next delivery attempt.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the webhook whose auth token should be regenerated.
+          schema:
+            type: string
+      tags:
+        - Webhooks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+      responses:
+        '200':
+          description: The webhook object containing the newly generated auth token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerWebhook'
+
+  /api/v1/partnership/webhooks/{id}/test/:
+    post:
+      operationId: webhooks_test_create
+      summary: Test a webhook
+      description: >
+        Sends a test payload to the webhook's registered URL. Use this after
+        creating or updating a webhook to confirm that your endpoint is reachable,
+        correctly parses the payload, and returns a `2xx` HTTP response.
+
+        The test delivery is recorded in `last_use_at` and `last_response_status_code`,
+        just like a real event delivery.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the webhook to test.
+          schema:
+            type: string
+      tags:
+        - Webhooks
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PartnerWebhook'
+      responses:
+        '200':
+          description: The webhook object with updated delivery metadata after the test.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerWebhook'
+
+# =============================================================================
+# Component Schemas
+# =============================================================================
 components:
-  # securitySchemes:
-  #   cookieAuth:
-  #     type: apiKey
-  #     in: cookie
-  #     name: Session
-  #   basicAuth:
-  #     type: http
-  #     scheme: basic
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: >
+        HTTP Basic Authentication using your partner credentials.
+
+        The `Authorization` header must contain the word `Basic` followed by a
+        Base64-encoded string built from your UUID and API token separated by a colon:
+
+        ```
+        Authorization: Basic Base64(uuid:api_token)
+        ```
+
+        **Example** — for UUID `550e8400-e29b-41d4-a716-446655440000` and token `api_sec_1234`:
+
+        ```
+        # Raw credentials
+        550e8400-e29b-41d4-a716-446655440000:api_sec_1234
+
+        # Base64-encoded
+        NTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwOmFwaV9zZWNfMTIzNA==
+
+        # Final header
+        Authorization: Basic NTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwOmFwaV9zZWNfMTIzNA==
+        ```
+
+        Both credentials are provided during partner onboarding. Treat them as secrets
+        and rotate your API token immediately if it is compromised (see the webhook
+        auth-token endpoints for a comparable token rotation pattern).
+
   schemas:
+    # -------------------------------------------------------------------------
+    # PartnerRestaurant
+    # -------------------------------------------------------------------------
     PartnerRestaurant:
       type: object
+      description: >
+        Represents a restaurant that is accessible to the authenticated partner.
+        All fields except `schema_name` are read-only and managed by the restaurant
+        owner on the Barestho platform.
       properties:
         id:
           type: integer
           readOnly: true
+          description: Unique numeric identifier for the restaurant, assigned by the server.
         display_name:
           type: string
           readOnly: true
+          description: Human-readable name of the restaurant as configured by its owner.
         schema_name:
           type: string
           maxLength: 63
+          description: >
+            Internal tenant identifier used to scope database queries.
+            This value is assigned during restaurant onboarding and must be unique
+            across the platform. Maximum length is 63 characters.
         address:
           type: string
           readOnly: true
+          description: Full postal address of the restaurant.
         website:
           type: string
           readOnly: true
+          description: URL of the restaurant's public website, if provided.
         latitude:
           type: number
           format: float
           readOnly: true
+          description: Geographic latitude of the restaurant location (WGS 84 decimal degrees).
         longitude:
           type: number
           format: float
           readOnly: true
+          description: Geographic longitude of the restaurant location (WGS 84 decimal degrees).
         timezone:
           type: string
           readOnly: true
+          description: >
+            IANA timezone identifier for the restaurant (e.g. `Europe/Paris`).
+            All reservation `start_time` values should be interpreted in this timezone.
       required:
-      - schema_name
+        - schema_name
+
+    # -------------------------------------------------------------------------
+    # PartnerWebhook
+    # -------------------------------------------------------------------------
     PartnerWebhook:
       type: object
+      description: >
+        Represents a webhook endpoint registered by the partner. When subscribed events
+        occur (e.g. a reservation is created or cancelled), the platform sends an HTTP POST
+        request to the registered `url` containing the event payload.
       properties:
         id:
           type: integer
           readOnly: true
+          description: Unique numeric identifier for the webhook, assigned by the server.
         created_at:
           type: string
           format: date-time
           readOnly: true
+          description: ISO 8601 timestamp indicating when the webhook was created.
         updated_at:
           type: string
           format: date-time
           readOnly: true
+          description: ISO 8601 timestamp indicating when the webhook was last modified.
         url:
           type: string
           format: uri
           maxLength: 500
+          description: >
+            The publicly accessible URL that will receive event POST requests.
+            Must be a valid URI (HTTP or HTTPS). Maximum length is 500 characters.
           pattern: "^(?:[a-z0-9\\.\\-\\+]*)://(?:\\S+(?::\\S*)?@)?(?:(?:25[0-5]|2[0-4]\\\
             d|[0-1]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)){3}|\\[[0-9a-f:\\\
-            .]+\\]|([a-z\xA1-\uFFFF0-9](?:[a-z\xA1-\uFFFF0-9-]{0,61}[a-z\xA1-\uFFFF\
-            0-9])?(?:\\.(?!-)[a-z\xA1-\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\xA1\
-            -\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::\\d{2,5})?(?:[/?#][^\\\
+            .]+\\]|([a-z\\xA1-\\uFFFF0-9](?:[a-z\\xA1-\\uFFFF0-9-]{0,61}[a-z\\xA1-\\uFFFF\
+            0-9])?(?:\\.(?!-)[a-z\\xA1-\\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\\xA1\
+            -\\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::\\d{2,5})?(?:[/?#][^\\\
             s]*)?\\Z"
         name:
           type: string
           nullable: true
           maxLength: 125
+          description: >
+            Optional human-readable label for the webhook, useful for identifying it
+            in dashboards or logs. Maximum length is 125 characters.
         is_enabled:
           type: boolean
+          description: >
+            When `true`, the webhook is active and will receive event deliveries.
+            Set to `false` to pause deliveries without deleting the webhook.
         last_use_at:
           type: string
           format: date-time
           nullable: true
+          description: >
+            ISO 8601 timestamp of the most recent delivery attempt (successful or not).
+            `null` if the webhook has never been triggered.
         last_response_status_code:
           type: integer
           maximum: 32767
-          nullable: true
           minimum: 0
+          nullable: true
+          description: >
+            HTTP status code returned by the target URL on its most recent delivery attempt.
+            `null` if no delivery has been made yet. A `2xx` value indicates success.
         last_response:
           type: object
           additionalProperties: {}
           nullable: true
+          description: >
+            The response body returned by the target URL on its most recent delivery attempt,
+            stored as a JSON object. `null` if no delivery has been made or the response
+            body was empty.
         subscribed_events:
           type: object
           additionalProperties: {}
           nullable: true
+          description: >
+            A JSON object mapping event type keys to boolean values, specifying which
+            platform events should trigger a delivery to this webhook. Consult the
+            event catalogue in your partner documentation for available event type keys.
       required:
-      - url
-    PartnerRestaurantReservation:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        first_name:
-          type: string
-          nullable: true
-          maxLength: 255
-        last_name:
-          type: string
-          nullable: true
-          maxLength: 255
-        email:
-          type: string
-          format: email
-          nullable: true
-          maxLength: 254
-        phone:
-          type: string
-          nullable: true
-          maxLength: 128
-        start_time:
-          type: string
-          format: date-time
-        duration:
-          type: string
-          readOnly: true
-        adults:
-          type: integer
-          maximum: 50
-          minimum: 1
-        children:
-          type: integer
-          maximum: 50
-        comment:
-          type: string
-          nullable: true
-        cancelled:
-          type: boolean
-        cancelled_at:
-          type: string
-          format: date-time
-          nullable: true
-        confirmed:
-          type: boolean
-        confirmed_at:
-          type: string
-          format: date-time
-          nullable: true
-        confirmation_mode:
-          enum:
-          - CONFIRMATION_MODE_SYNCHRONOUS
-          - CONFIRMATION_MODE_ASYNCHRONOUS
-          type: string
-        arrived:
-          type: boolean
-        arrived_at:
-          type: string
-          format: date-time
-          nullable: true
-        no_show:
-          type: boolean
-        no_show_at:
-          type: string
-          format: date-time
-          nullable: true
-        language:
-          type: string
-        metadata:
-          type: object
-          additionalProperties: {}
-          nullable: true
-      required:
-      - start_time
-      - adults
+        - url
+
+    # -------------------------------------------------------------------------
+    # PatchedPartnerWebhook
+    # -------------------------------------------------------------------------
     PatchedPartnerWebhook:
       type: object
+      description: >
+        Partial representation of a webhook used for PATCH requests. All fields are
+        optional; only the fields present in the request body will be updated.
       properties:
         id:
           type: integer
           readOnly: true
+          description: Unique numeric identifier for the webhook. Read-only; cannot be modified.
         created_at:
           type: string
           format: date-time
           readOnly: true
+          description: ISO 8601 timestamp of webhook creation. Read-only.
         updated_at:
           type: string
           format: date-time
           readOnly: true
+          description: ISO 8601 timestamp of the last webhook modification. Read-only.
         url:
           type: string
           format: uri
           maxLength: 500
+          description: >
+            Updated target URL for event delivery. Must be a valid URI. Maximum 500 characters.
           pattern: "^(?:[a-z0-9\\.\\-\\+]*)://(?:\\S+(?::\\S*)?@)?(?:(?:25[0-5]|2[0-4]\\\
             d|[0-1]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)){3}|\\[[0-9a-f:\\\
-            .]+\\]|([a-z\xA1-\uFFFF0-9](?:[a-z\xA1-\uFFFF0-9-]{0,61}[a-z\xA1-\uFFFF\
-            0-9])?(?:\\.(?!-)[a-z\xA1-\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\xA1\
-            -\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::\\d{2,5})?(?:[/?#][^\\\
+            .]+\\]|([a-z\\xA1-\\uFFFF0-9](?:[a-z\\xA1-\\uFFFF0-9-]{0,61}[a-z\\xA1-\\uFFFF\
+            0-9])?(?:\\.(?!-)[a-z\\xA1-\\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\\xA1\
+            -\\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::\\d{2,5})?(?:[/?#][^\\\
             s]*)?\\Z"
         name:
           type: string
           nullable: true
           maxLength: 125
+          description: Updated human-readable label. Set to `null` to remove the label.
         is_enabled:
           type: boolean
+          description: Set to `false` to pause deliveries, or `true` to resume them.
         last_use_at:
           type: string
           format: date-time
           nullable: true
+          description: ISO 8601 timestamp of the last delivery attempt. Managed by the server.
         last_response_status_code:
           type: integer
           maximum: 32767
-          nullable: true
           minimum: 0
+          nullable: true
+          description: HTTP status code from the most recent delivery response. Managed by the server.
         last_response:
           type: object
           additionalProperties: {}
           nullable: true
+          description: Response body from the most recent delivery. Managed by the server.
         subscribed_events:
           type: object
           additionalProperties: {}
           nullable: true
-    PatchedPartnerRestaurantReservation:
+          description: >
+            Updated event subscription map. Replaces the existing subscription configuration
+            entirely when provided.
+
+    # -------------------------------------------------------------------------
+    # PartnerRestaurantReservation
+    # -------------------------------------------------------------------------
+    PartnerRestaurantReservation:
       type: object
+      description: >
+        Represents a dining reservation at a restaurant. The lifecycle of a reservation
+        progresses through several states: created → confirmed → arrived (or no-show),
+        and may be cancelled at any point before arrival.
       properties:
         id:
           type: integer
           readOnly: true
+          description: Unique numeric identifier for the reservation, assigned by the server.
         first_name:
           type: string
           nullable: true
           maxLength: 255
+          description: First name of the guest holding the reservation. Maximum 255 characters.
         last_name:
           type: string
           nullable: true
           maxLength: 255
+          description: Last name of the guest holding the reservation. Maximum 255 characters.
         email:
           type: string
           format: email
           nullable: true
           maxLength: 254
+          description: Email address of the guest. Used for booking confirmations and reminders.
         phone:
           type: string
           nullable: true
           maxLength: 128
+          description: Phone number of the guest. Maximum 128 characters.
         start_time:
           type: string
           format: date-time
+          description: >
+            ISO 8601 date-time indicating when the reservation begins.
+            Should be expressed in the restaurant's local timezone (see `PartnerRestaurant.timezone`).
+            **Required.**
         duration:
           type: string
           readOnly: true
+          description: >
+            Duration of the reservation slot as an ISO 8601 duration string (e.g. `PT2H`).
+            Calculated and set by the server based on the restaurant's slot configuration.
         adults:
           type: integer
           maximum: 50
           minimum: 1
+          description: >
+            Number of adult guests in the party. Must be between 1 and 50 (inclusive).
+            **Required.**
         children:
           type: integer
           maximum: 50
+          description: >
+            Number of child guests in the party. Defaults to 0 if omitted.
+            Must be between 0 and 50 (inclusive).
         comment:
           type: string
           nullable: true
+          description: >
+            Optional free-text comment from the guest or partner (e.g. dietary requirements,
+            special occasion notes). Visible to the restaurant.
         cancelled:
           type: boolean
+          description: >
+            `true` if the reservation has been cancelled. Set this to `true` via PATCH
+            to cancel a reservation. The `cancelled_at` timestamp is set automatically.
         cancelled_at:
           type: string
           format: date-time
           nullable: true
+          description: >
+            ISO 8601 timestamp of when the reservation was cancelled.
+            Set automatically by the server when `cancelled` transitions to `true`.
         confirmed:
           type: boolean
+          description: >
+            `true` if the reservation has been confirmed by the restaurant.
+            For synchronous confirmation mode, this is set to `true` immediately upon creation.
         confirmed_at:
           type: string
           format: date-time
           nullable: true
+          description: >
+            ISO 8601 timestamp of when the reservation was confirmed.
+            Set automatically by the server when `confirmed` transitions to `true`.
         confirmation_mode:
-          enum:
-          - CONFIRMATION_MODE_SYNCHRONOUS
-          - CONFIRMATION_MODE_ASYNCHRONOUS
           type: string
+          enum:
+            - CONFIRMATION_MODE_SYNCHRONOUS
+            - CONFIRMATION_MODE_ASYNCHRONOUS
+          description: >
+            Defines how the reservation is confirmed:
+            - `CONFIRMATION_MODE_SYNCHRONOUS`: The reservation is confirmed immediately
+              upon creation. `confirmed` will be `true` in the creation response.
+            - `CONFIRMATION_MODE_ASYNCHRONOUS`: The reservation requires explicit confirmation
+              by the restaurant. Poll the reservation or listen to webhooks to detect
+              when `confirmed` becomes `true`.
         arrived:
           type: boolean
+          description: >
+            `true` if the guest has checked in at the restaurant.
+            Set this to `true` via PATCH when the guest arrives. The `arrived_at`
+            timestamp is set automatically.
         arrived_at:
           type: string
           format: date-time
           nullable: true
+          description: >
+            ISO 8601 timestamp of when the guest was marked as arrived.
+            Set automatically by the server when `arrived` transitions to `true`.
         no_show:
           type: boolean
+          description: >
+            `true` if the guest did not show up for the reservation.
+            Set this to `true` via PATCH to record a no-show. The `no_show_at`
+            timestamp is set automatically.
         no_show_at:
           type: string
           format: date-time
           nullable: true
+          description: >
+            ISO 8601 timestamp of when the reservation was marked as a no-show.
+            Set automatically by the server when `no_show` transitions to `true`.
         language:
           type: string
+          description: >
+            BCP 47 language tag representing the guest's preferred language
+            (e.g. `en`, `fr`, `nl`). Used to localise guest-facing communications.
         metadata:
           type: object
           additionalProperties: {}
           nullable: true
+          description: >
+            Arbitrary key-value pairs that the partner can attach to a reservation
+            for their own tracking purposes (e.g. internal booking reference, campaign ID).
+            The platform stores this data as-is and does not interpret it.
+      required:
+        - start_time
+        - adults
+
+    # -------------------------------------------------------------------------
+    # PatchedPartnerRestaurantReservation
+    # -------------------------------------------------------------------------
+    PatchedPartnerRestaurantReservation:
+      type: object
+      description: >
+        Partial representation of a reservation used for PATCH requests.
+        All fields are optional; only the fields present in the request body will be updated.
+        Refer to `PartnerRestaurantReservation` for full field semantics.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+          description: Unique numeric identifier for the reservation. Read-only.
+        first_name:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Updated first name of the guest.
+        last_name:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Updated last name of the guest.
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 254
+          description: Updated email address of the guest.
+        phone:
+          type: string
+          nullable: true
+          maxLength: 128
+          description: Updated phone number of the guest.
+        start_time:
+          type: string
+          format: date-time
+          description: Updated reservation start time (ISO 8601). Changes may affect availability.
+        duration:
+          type: string
+          readOnly: true
+          description: Reservation duration. Recalculated by the server if `start_time` changes.
+        adults:
+          type: integer
+          maximum: 50
+          minimum: 1
+          description: Updated adult guest count. Must be between 1 and 50.
+        children:
+          type: integer
+          maximum: 50
+          description: Updated child guest count. Must be between 0 and 50.
+        comment:
+          type: string
+          nullable: true
+          description: Updated guest or partner comment. Set to `null` to clear.
+        cancelled:
+          type: boolean
+          description: Set to `true` to cancel the reservation. Triggers `cancelled_at` automatically.
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cancellation timestamp. Managed by the server.
+        confirmed:
+          type: boolean
+          description: Set to `true` to confirm the reservation (asynchronous flow).
+        confirmed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Confirmation timestamp. Managed by the server.
+        confirmation_mode:
+          type: string
+          enum:
+            - CONFIRMATION_MODE_SYNCHRONOUS
+            - CONFIRMATION_MODE_ASYNCHRONOUS
+          description: Updated confirmation mode. Refer to `PartnerRestaurantReservation.confirmation_mode`.
+        arrived:
+          type: boolean
+          description: Set to `true` to mark the guest as arrived. Triggers `arrived_at` automatically.
+        arrived_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Arrival timestamp. Managed by the server.
+        no_show:
+          type: boolean
+          description: Set to `true` to record a no-show. Triggers `no_show_at` automatically.
+        no_show_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: No-show timestamp. Managed by the server.
+        language:
+          type: string
+          description: Updated BCP 47 language tag for the guest.
+        metadata:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          description: Updated arbitrary metadata object. Replaces the existing metadata entirely when provided.
