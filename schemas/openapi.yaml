@@ -82,6 +82,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PartnerRestaurant'
+        '404':
+          description: Not found.
 
   /api/v1/partnership/restaurants/{id}/availabilities/:
     get:
@@ -98,6 +100,18 @@ paths:
           in: path
           required: true
           description: The unique identifier of the restaurant whose availabilities are requested.
+          schema:
+            type: string
+        - name: from_datetime
+          in: query
+          required: true
+          description: The date and time from which availabilities will be calculated.
+          schema:
+            type: string
+        - name: to_datetime
+          in: query
+          required: true
+          description: The date and time to which availabilities will be calculated.
           schema:
             type: string
       tags:
@@ -144,14 +158,11 @@ paths:
       operationId: restaurants_reservations_create
       summary: Create a restaurant reservation
       description: >
-        Creates a new reservation for a guest at the specified restaurant.
+        Creates a new reservation for a guest at the specified restaurant if there is availability.
         At minimum you must provide `start_time` and `adults`. The `confirmation_mode`
         field determines whether the reservation is confirmed immediately
         (`CONFIRMATION_MODE_SYNCHRONOUS`) or requires an asynchronous approval step
         (`CONFIRMATION_MODE_ASYNCHRONOUS`).
-
-        A webhook event is emitted after a successful creation if the restaurant has
-        an active webhook subscription for reservation events.
       parameters:
         - name: restaurant_pk
           in: path
@@ -186,9 +197,7 @@ paths:
       summary: Retrieve a restaurant reservation
       description: >
         Returns the full details of a single reservation identified by its ID
-        within the given restaurant. Use this endpoint to poll the current state
-        of a reservation (e.g. to check whether an asynchronous confirmation
-        has been processed).
+        within the given restaurant.
       parameters:
         - name: id
           in: path
@@ -211,6 +220,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PartnerRestaurantReservation'
+        '404':
+          description: Not found.
 
     patch:
       operationId: restaurants_reservations_partial_update
@@ -218,11 +229,6 @@ paths:
       description: >
         Partially updates a reservation. Only the fields included in the request body
         are modified; all other fields retain their current values.
-
-        Common use cases include cancelling a reservation (set `cancelled` to `true`),
-        marking a guest as arrived (set `arrived` to `true`), or recording a no-show
-        (set `no_show` to `true`). Timestamps such as `cancelled_at` and `arrived_at`
-        are set automatically by the server when the corresponding boolean flag changes.
       parameters:
         - name: id
           in: path
@@ -238,17 +244,7 @@ paths:
             type: string
       tags:
         - Reservations
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedPartnerRestaurantReservation'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedPartnerRestaurantReservation'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedPartnerRestaurantReservation'
+
       responses:
         '200':
           description: The updated reservation object.
@@ -256,6 +252,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PatchedPartnerRestaurantReservation'
+        '404':
+          description: Not found.
+
+  /api/v1/partnership/restaurants/{restaurant_pk}/reservations/{id}/?action=cancel:
+    patch:
+      operationId: restaurants_reservations_cancellation
+      summary: Cancel a restaurant reservation
+      description: >
+        Cancels the reservation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the reservation to update.
+          schema:
+            type: string
+        - name: restaurant_pk
+          in: path
+          required: true
+          description: The unique identifier of the restaurant that owns the reservation.
+          schema:
+            type: string
+      tags:
+        - Reservations
+      responses:
+        '200':
+          description: The updated reservation object.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatchedPartnerRestaurantReservation'
+        '404':
+          description: Not found.
 
   # ---------------------------------------------------------------------------
   # Partner Profile
@@ -276,10 +305,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  description: Partner profile attributes. Shape varies per partner configuration.
+                $ref: '#/components/schemas/PartnerProfile'
 
     patch:
       operationId: profile_partial_update
@@ -293,28 +319,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: {}
-              description: >
-                Partial partner profile payload. Send only the fields you wish to update.
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              additionalProperties: {}
-              description: Partial partner profile payload (form-encoded).
-          multipart/form-data:
-            schema:
-              type: object
-              additionalProperties: {}
-              description: Partial partner profile payload (multipart form).
+              $ref: '#/components/schemas/PartnerProfile'
       responses:
         '200':
           description: The updated partner profile.
           content:
             application/json:
               schema:
-                type: object
-                description: Updated partner profile attributes.
+                $ref: '#/components/schemas/PartnerProfile'
 
   # ---------------------------------------------------------------------------
   # Webhooks
@@ -621,6 +633,47 @@ components:
 
   schemas:
     # -------------------------------------------------------------------------
+    # PartnerProfile
+    # -------------------------------------------------------------------------
+    PartnerProfile:
+      type: object
+      description: >
+        Represents a partner profile. It contains information shown to restaurants in their partners list.
+      properties:
+        uuid:
+          type: string
+          readOnly: true
+          description: Unique partner UUID used for authentication.
+        name:
+          type: string
+          description: Partner's display name. This value is shown to restaurants.
+        description:
+          type: object
+          properties:
+            fr:
+              type: string
+              description: French translation.
+            nl:
+              type: string
+              description: Dutch translation.
+            en:
+              type: string
+              description: English translation.
+            de:
+              type: string
+              description: German translation.
+          nullable: true
+          description: >
+            Object containing localized partner descriptions 
+            (e.g. `{ fr: "Partenaire Barestho", nl: "Partner van Barestho" }`).
+            This value is shown to restaurants.
+        website_url:
+          type: string
+          format: url
+          nullable: true
+          description: >
+            Url to the partner website. This value is shown to restaurants.
+    # -------------------------------------------------------------------------
     # PartnerRestaurant
     # -------------------------------------------------------------------------
     PartnerRestaurant:
@@ -703,12 +756,12 @@ components:
           description: >
             The publicly accessible URL that will receive event POST requests.
             Must be a valid URI (HTTP or HTTPS). Maximum length is 500 characters.
-          pattern: "^(?:[a-z0-9\\.\\-\\+]*)://(?:\\S+(?::\\S*)?@)?(?:(?:25[0-5]|2[0-4]\\\
-            d|[0-1]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)){3}|\\[[0-9a-f:\\\
-            .]+\\]|([a-z\\xA1-\\uFFFF0-9](?:[a-z\\xA1-\\uFFFF0-9-]{0,61}[a-z\\xA1-\\uFFFF\
-            0-9])?(?:\\.(?!-)[a-z\\xA1-\\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\\xA1\
-            -\\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::\\d{2,5})?(?:[/?#][^\\\
-            s]*)?\\Z"
+          # pattern: "^(?:[a-z0-9\\.\\-\\+]*)://(?:\\S+(?::\\S*)?@)?(?:(?:25[0-5]|2[0-4]\\\
+          #   d|[0-1]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)){3}|\\[[0-9a-f:\\\
+          #   .]+\\]|([a-z\\xA1-\\uFFFF0-9](?:[a-z\\xA1-\\uFFFF0-9-]{0,61}[a-z\\xA1-\\uFFFF\
+          #   0-9])?(?:\\.(?!-)[a-z\\xA1-\\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\\xA1\
+          #   -\\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::\\d{2,5})?(?:[/?#][^\\\
+          #   s]*)?\\Z"
         name:
           type: string
           nullable: true
@@ -784,12 +837,12 @@ components:
           maxLength: 500
           description: >
             Updated target URL for event delivery. Must be a valid URI. Maximum 500 characters.
-          pattern: "^(?:[a-z0-9\\.\\-\\+]*)://(?:\\S+(?::\\S*)?@)?(?:(?:25[0-5]|2[0-4]\\\
-            d|[0-1]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)){3}|\\[[0-9a-f:\\\
-            .]+\\]|([a-z\\xA1-\\uFFFF0-9](?:[a-z\\xA1-\\uFFFF0-9-]{0,61}[a-z\\xA1-\\uFFFF\
-            0-9])?(?:\\.(?!-)[a-z\\xA1-\\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\\xA1\
-            -\\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::\\d{2,5})?(?:[/?#][^\\\
-            s]*)?\\Z"
+          # pattern: "^(?:[a-z0-9\\.\\-\\+]*)://(?:\\S+(?::\\S*)?@)?(?:(?:25[0-5]|2[0-4]\\\
+          #   d|[0-1]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)){3}|\\[[0-9a-f:\\\
+          #   .]+\\]|([a-z\\xA1-\\uFFFF0-9](?:[a-z\\xA1-\\uFFFF0-9-]{0,61}[a-z\\xA1-\\uFFFF\
+          #   0-9])?(?:\\.(?!-)[a-z\\xA1-\\uFFFF0-9-]{1,63}(?<!-))*\\.(?!-)(?:[a-z\\xA1\
+          #   -\\uFFFF-]{2,63}|xn--[a-z0-9]{1,59})(?<!-)\\.?|localhost))(?::\\d{2,5})?(?:[/?#][^\\\
+          #   s]*)?\\Z"
         name:
           type: string
           nullable: true
