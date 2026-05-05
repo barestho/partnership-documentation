@@ -6,6 +6,8 @@ import starlightOpenAPI, { openAPISidebarGroups } from 'starlight-openapi';
 
 // https://astro.build/config
 export default defineConfig({
+	site: 'https://barestho.github.io',
+	base: '/partnership-documentation',
 	integrations: [
 		starlight({
 			favicon: './public/favicon.ico',
