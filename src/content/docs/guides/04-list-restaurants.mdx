@@ -7,6 +7,17 @@ import { Aside } from '@astrojs/starlight/components';
 
 Before a restaurant appears in your list, its manager must first **explicitly authorize your access** from the Barestho back office. Without this agreement, the restaurant will not be visible, even if it is listed on the platform.
 
+<Aside type="note">
+If you are a Barestho client managing your own restaurants, the link set up by the Barestho team is your agreement: no extra authorization is needed.
+</Aside>
+
+Only **active** restaurants are visible. For a restaurant you cannot use:
+
+| Case | Response |
+|---|---|
+| Not linked to you, inactive, or unknown | `404` with the code `NOT_FOUND` |
+| Linked to you, but access not granted | `403` with the code `RESTAURANT_ACCESS_DENIED` |
+
 ## List Accessible Restaurants
 
 Once agreement is obtained, you can retrieve the list of your accessible restaurants via:
@@ -32,7 +43,10 @@ Authorization: Basic <base64(uuid:token)>
             "website": "http://www.barestho.com",
             "latitude": 50.4598685156642,
             "longitude": 3.9279265707227755,
-            "timezone": "Europe/Brussels"
+            "timezone": "Europe/Brussels",
+            "access": {
+                "scopes": ["availabilities:read", "reservations:write_own"]
+            }
         }
     ]
 }
@@ -44,3 +58,34 @@ This list only returns restaurants that have actively granted access. It may cha
 <Aside type="caution">
 At this stage, no write operations are available for restaurants. This endpoint is accessible in read-only mode.
 </Aside>
+
+## Permissions (scopes)
+
+Each restaurant grants you a set of **scopes**, listed in `access.scopes`. Each endpoint needs one of them. Without it, the API answers `403` with the code `SCOPE_MISSING`, and `details` lists the accepted scopes.
+
+| Scope | Gives access to |
+|---|---|
+| `availabilities:read` | Availabilities, zones |
+| `reservations:write_own` | Create, read, update and cancel **your** reservations |
+| `reservations:read_all` | Read **every** reservation of the restaurant, from all channels |
+| `reservations:manage` | Update any reservation and change its status |
+| `tables:read` | Tables |
+
+By default, you get `availabilities:read` and `reservations:write_own`. A restaurant may grant you more, for example `reservations:manage` for a POS. Scopes are set per restaurant: always read `access.scopes` of the restaurant you work with.
+
+<Aside type="note">
+More scopes exist for future features. Ignore the values you do not know.
+</Aside>
+
+## Restaurant Modules
+
+A scope is not enough when the restaurant has disabled the related module. The API then answers `403` with the code `MODULE_DISABLED`, and `details` names the module. Today, the `RESERVATIONS` module gates availabilities and reservation creation.
+
+## Zones and Tables
+
+| Endpoint | Scope | Content |
+|---|---|---|
+| `GET /api/v1/partnership/restaurants/:restaurant_id/zones/` | `availabilities:read` | Zones: `id`, `name`, `description`, `is_public`, `priority` |
+| `GET /api/v1/partnership/restaurants/:restaurant_id/tables/` | `tables:read` | Tables: `id`, `name`, `zone_id`, `zone_name`, `seats`, `min_seats`, `type`, `priority` |
+
+Both lists are paginated with `limit` and `offset`. They hold inactive items too: add `active=true` to skip them. Zones filter on `name`; tables filter on `name`, `zone`, `zone_name` and `seats`. Zone ids are the keys of the `availability` object (see [Read Availabilities](/partnership-documentation/guides/06-read-availabilities)).

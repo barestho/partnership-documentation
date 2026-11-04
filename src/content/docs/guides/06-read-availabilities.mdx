@@ -5,6 +5,8 @@ import { Aside } from '@astrojs/starlight/components';
 
 Understanding how Barestho structures its availability is essential for displaying the correct time slots to your users. The data is organized to reflect the actual real-time capacity per **Zone** of the establishment.
 
+Reading availabilities needs the `availabilities:read` scope and the restaurant `RESERVATIONS` module. Otherwise, the API answers `403` with the code `SCOPE_MISSING` or `MODULE_DISABLED`.
+
 ## Data Structure
 
 The availability flow follows a top-down hierarchy: 
@@ -28,8 +30,8 @@ The `availability` object represents the distribution of free seats within the d
 }
 ```
 
-### Key Points to Remember:
-* **First-level keys (`"1"`, `"2"`)**: Correspond to the unique identifiers of the restaurant's zones.
+### Key Points to Remember
+* **First-level keys (`"1"`, `"2"`)**: Correspond to the unique identifiers of the restaurant's zones. Get their names with `GET /api/v1/partnership/restaurants/:restaurant_id/zones/`.
 * **Second-level keys (`"2"`, `"4"`)**: Represent the number of people (party size).
 * **Values (`6`, `4`)**: Represent the number of tables/slots remaining for that specific configuration.
 

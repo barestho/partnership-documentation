@@ -6,7 +6,17 @@ import { Aside } from '@astrojs/starlight/components';
 
 ## Access Scope
 
-A partner only has access to reservations they have personally created via the API. Reservations originating from other channels (Barestho form, Google, etc.) are not visible.
+What you can do depends on the [scopes](/partnership-documentation/guides/04-list-restaurants) granted by the restaurant:
+
+| Scope | Read | Write (update, cancel) |
+|---|---|---|
+| `reservations:write_own` | Your own reservations | Your own reservations |
+| `reservations:read_all` | Every reservation of the restaurant, from all channels (Barestho form, Google, etc.) | — |
+| `reservations:manage` | — | Every reservation of the restaurant |
+
+Writing to a reservation from another channel without `reservations:manage` returns `403` with the code `NOT_RESERVATION_OWNER`.
+
+The `source` field tells which channel a reservation comes from. Your reservations have `source: "BARESTHO_PARTNER"`. You can filter the list with `?source=...`.
 
 ---
 
@@ -26,7 +36,30 @@ Host: public.api.barestho.com
 Authorization: Basic <base64(uuid:token)>
 ```
 
+Hidden reservations are never returned. Useful filters (query parameters):
+
+| Filter | Example |
+|---|---|
+| Status marks | `?confirmed=true`, `?cancelled=false`, `?arrived=true`, `?no_show=true` |
+| Guest | `?last_name__iexact=weissnat`, `?email__iexact=k@example.com` |
+| Day | `?start_time__date=2026-05-12`, `?start_time__date__gte=2026-05-01` (same for `created_at` and `updated_at`) |
+| Channel | `?source=GOOGLE`, `?initiator_partner_name=Acme%20Booking` |
+| Metadata | `?metadata.booking_ref=BK-1042`: any key of `metadata`, text values only |
+| Sort | `?ordering=-start_time` |
+
+Each reservation also gives:
+
+- `cake`, `stroller`, `highchair`, `reduced_mobility` and `special_options` (allergies, type of meal…): the guest's requests, read-only.
+- `initiator_partner_name`: the partner that created the reservation, `null` for other channels.
+- `last_cancellable_at`: the last moment a booking channel can cancel it (see [Cancellation Deadline](#cancellation-deadline)).
+
+<Aside type="danger">
+Never put sensitive data (health, payment, passwords…) in `metadata`. Every partner that reads the reservation sees it.
+</Aside>
+
 ### Create a Reservation
+
+Needs the `reservations:write_own` scope and the restaurant `RESERVATIONS` module.
 
 ```http
 POST /api/v1/partnership/restaurants/:restaurant_id/reservations/ HTTP/1.1
@@ -36,38 +69,64 @@ Content-Type: application/json
 ```
 ```json
 {
-  "id": 25,
   "first_name": "Kristopher",
   "last_name": "Weissnat",
   "email": null,
   "phone": null,
   "start_time": "2026-05-12T12:00:00+02:00",
-  "duration": "02:00:00",
   "adults": 3,
   "children": 0,
   "comment": null,
-  "cancelled": false,
-  "cancelled_at": null,
-  "confirmed": false,
-  "confirmed_at": null,
-  "confirmation_mode": "CONFIRMATION_MODE_ASYNCHRONOUS",
-  "arrived": false,
-  "arrived_at": null,
-  "no_show": false,
-  "no_show_at": null,
   "language": "en",
   "metadata": null
 }
 ```
+
+A successful creation returns `201 Created` with the full reservation. The statuses (`confirmed`, `cancelled`, `arrived`, `no_show`, their dates and `confirmation_mode`) are read-only: Barestho sets them. Change them with `action` (see [Cancel or Change the Status](#cancel-or-change-the-status)).
 <Aside type="caution">
-A reservation can only be created if the restaurant has availability for the requested time slot. If there is no availability, the API will return a `409 Conflict` response.
+A reservation can only be created if the restaurant has availability for the requested time slot. If there is no availability, the API returns `400` with the code `SLOT_UNAVAILABLE`. If the slot requires a prepayment, the API returns `400` with the code `PAYMENT_REQUIRED`: payments are not supported by the API yet. The `message` names the slot, for example: `No table is available for 4 guests on 2026-05-12 at 20:00. Read the availabilities and choose another time slot.`
 </Aside>
+
+### Choose the Zone or the Tables
+
+Barestho assigns the tables automatically. You can guide it:
+
+| Option | Who | Effect |
+|---|---|---|
+| `zone_id` (body) | Every partner | Assigns tables of this zone only. The zone must be public (`is_public`) |
+| `tables` (body) | `CLIENT` partners | Assigns these active table ids, without any availability check: a table may then hold two reservations |
+| `?greedy=true` | `CLIENT` partners | Greedy mode of the automatic assignment |
+
+- Send `zone_id` **or** `tables`, not both: otherwise `400 VALIDATION_ERROR`.
+- A partner that is not `CLIENT` sending `tables` or `greedy` gets `400 VALIDATION_ERROR`.
 
 ---
 
-## Cancel a Reservation
+## Update a Reservation
 
-A partner can only cancel reservations they have created:
+You can change `start_time`, `adults`, `children` and `metadata`. Send only the fields to change:
+
+```http
+PATCH /api/v1/partnership/restaurants/:restaurant_id/reservations/:id/ HTTP/1.1
+Host: public.api.barestho.com
+Authorization: Basic <base64(uuid:token)>
+Content-Type: application/json
+
+{
+    "start_time": "2026-05-12T20:30:00+02:00",
+    "adults": 4
+}
+```
+
+- A new time slot or party size is checked against the availabilities. No free table: `400 SLOT_UNAVAILABLE`.
+- The reservation must come from a partner, be confirmed, not cancelled and not past. Otherwise: `400 VALIDATION_ERROR`, with the reason in `message`.
+- The status cannot change with this request: use `action` (below).
+
+---
+
+## Cancel or Change the Status
+
+You can cancel your own reservations with `reservations:write_own`, and any reservation with `reservations:manage`:
 
 ```http
 PATCH /api/v1/partnership/restaurants/:restaurant_id/reservations/:id/?action=cancel HTTP/1.1
@@ -75,8 +134,30 @@ Host: public.api.barestho.com
 Authorization: Basic <base64(uuid:token)>
 ```
 <Aside type="caution">
-Only reservations created by the partner can be cancelled via this route.
+Without `reservations:manage`, only reservations created by you can be cancelled via this route.
 </Aside>
+
+The other status actions (`confirm`, `mark_as_arrived`, `mark_as_no_show`, `reset_markers`) need the `reservations:manage` scope. A booking channel cannot confirm its own reservations: the restaurant does.
+
+| `action` | Effect | Allowed when the reservation is… | Scope |
+|---|---|---|---|
+| `cancel` | Cancels the reservation | Not cancelled, arrived or no-show | `reservations:write_own` (yours) or `reservations:manage` |
+| `confirm` | Confirms the reservation | Not cancelled, not already confirmed | `reservations:manage` |
+| `mark_as_arrived` | Marks the guest as arrived | Not cancelled, arrived or no-show | `reservations:manage` |
+| `mark_as_no_show` | Marks the guest as absent | Not cancelled, arrived or no-show | `reservations:manage` |
+| `reset_markers` | Removes the arrived and no-show marks | Arrived or no-show | `reservations:manage` |
+
+With `action`, the request body is ignored.
+
+- An unknown `action` returns `400 VALIDATION_ERROR`. The `message` lists the supported actions.
+- An action the current status does not allow returns `400 INVALID_STATUS_TRANSITION`. The `message` gives the current status, for example: `This reservation cannot be cancelled. Current status: confirmed, arrived.`
+
+### Cancellation Deadline
+
+A restaurant can set a cancellation deadline (for example, 24 hours before the reservation). After it, a booking channel cannot cancel anymore: the API returns `400 CANCELLATION_DEADLINE_PASSED`, and the guest must contact the restaurant.
+
+The deadline does not apply to a restaurant's own tools (`CLIENT` partners): they cancel on behalf of the restaurant.
+
 ---
 
 ## Webhook Events
@@ -92,3 +173,5 @@ The following events can be received on your webhooks regarding your reservation
 <Aside type="note">
 These events allow you to maintain the status of your reservations in real-time without having to continuously poll the API.
 </Aside>
+
+Failed deliveries are retried automatically. See [Delivery and Retries](/partnership-documentation/guides/02-creating-webhooks#delivery-and-retries).
