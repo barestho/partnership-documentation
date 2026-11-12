@@ -1,0 +1,107 @@
+---
+title: ⚙️ Configure the Restaurant
+---
+import { Aside } from '@astrojs/starlight/components';
+
+A restaurant may let you change its configuration. These scopes give access to it:
+
+| Scope | Gives access to |
+|---|---|
+| `restaurant:read` | Read the configuration of the restaurant. No route needs it yet: the special options can be read without any scope |
+| `restaurant:manage` | Change the configuration of the restaurant |
+
+Every change needs a read and write API key. See [Permissions](/partnership-documentation/guides/04-list-restaurants#permissions-scopes).
+
+## Special Options
+
+Special options are the choices a guest makes when booking: allergies, type of meal, occasion… The restaurant groups them in **categories**.
+
+<Aside type="note">
+Reading the special options needs no scope: any access granted by the restaurant is enough, so that you can choose options on your reservations. Changing them needs `restaurant:manage`.
+</Aside>
+
+### Categories
+
+```
+GET    /api/v1/partnership/restaurants/:restaurant_id/special-options/categories/
+POST   /api/v1/partnership/restaurants/:restaurant_id/special-options/categories/
+GET    /api/v1/partnership/restaurants/:restaurant_id/special-options/categories/:id/
+PATCH  /api/v1/partnership/restaurants/:restaurant_id/special-options/categories/:id/
+DELETE /api/v1/partnership/restaurants/:restaurant_id/special-options/categories/:id/
+```
+
+```json
+{
+    "id": 2,
+    "label": "Allergies",
+    "description": "Tell us about your allergies.",
+    "required": false,
+    "unique_choice": false,
+    "active": true,
+    "options": [
+        { "id": 7, "label": "Gluten", "message": null, "active": true }
+    ]
+}
+```
+
+| Field | Content |
+|---|---|
+| `label` | Up to 40 characters. Required at the creation |
+| `description` | Up to 255 characters, or `null` |
+| `required` | The booking widget of the restaurant requires a choice in this category. **Not enforced on your reservations** |
+| `unique_choice` | One option at most can be chosen in this category |
+| `active` | An inactive category and its options cannot be chosen |
+| `options` | The options of the category, read-only. Change them with the routes below |
+
+Filter the list with `?active=` and `?required=`, search with `?search=` (label), sort with `?ordering=id` or `label`.
+
+### Options
+
+```
+GET    /api/v1/partnership/restaurants/:restaurant_id/special-options/
+POST   /api/v1/partnership/restaurants/:restaurant_id/special-options/
+GET    /api/v1/partnership/restaurants/:restaurant_id/special-options/:id/
+PATCH  /api/v1/partnership/restaurants/:restaurant_id/special-options/:id/
+DELETE /api/v1/partnership/restaurants/:restaurant_id/special-options/:id/
+```
+
+```json
+{
+    "id": 7,
+    "category_id": 2,
+    "category_label": "Allergies",
+    "label": "Gluten",
+    "message": null,
+    "active": true
+}
+```
+
+| Field | Content |
+|---|---|
+| `category_id` | Category of the option. Required at the creation, it cannot change: to move an option, create a new one |
+| `label` | Up to 40 characters. Required at the creation |
+| `message` | Message shown to the guest when the option is chosen, up to 255 characters, or `null` |
+| `active` | An inactive option cannot be chosen |
+
+Filter the list with `?category_id=` and `?active=`, search with `?search=` (label), sort with `?ordering=id`, `label` or `category`.
+
+The creations accept an `Idempotency-Key` header. See [Retry Safely](/partnership-documentation/guides/05-manage-reservations#retry-safely).
+
+### Deletion
+
+`DELETE` answers `204` and hides the category or the option: it disappears from the lists and can no longer be chosen. The reservations that chose it keep it, with its label. The options of a deleted category disappear with it.
+
+To pause a category or an option for a while, set `active` to `false` instead: it stays listed and can be activated again.
+
+### Choose Options on a Reservation
+
+Send `special_option_ids` when you [create](/partnership-documentation/guides/05-manage-reservations#create-a-reservation) or [update](/partnership-documentation/guides/05-manage-reservations#update-a-reservation) a reservation:
+
+```json
+{ "special_option_ids": [7, 12] }
+```
+
+- Each option must be active, in an active category. Otherwise: `400 VALIDATION_ERROR`.
+- A category with `unique_choice` takes one option at most. Otherwise: `400 VALIDATION_ERROR`.
+- The `required` categories are not enforced on your reservations.
+- On a `PATCH`, the list replaces the options of the reservation. An empty list removes them. Without `special_option_ids`, they do not change.

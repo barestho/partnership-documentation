@@ -108,6 +108,8 @@ Content-Type: application/json
 }
 ```
 
+To choose special options (allergies, type of meal…), add `special_option_ids`: see [Choose Options on a Reservation](/partnership-documentation/guides/07-configure-the-restaurant#choose-options-on-a-reservation).
+
 A successful creation returns `201 Created` with the full reservation. The statuses (`confirmed`, `cancelled`, `arrived`, `no_show`, their dates and `confirmation_mode`) are read-only: Barestho sets them. Change them with `action` (see [Cancel or Change the Status](#cancel-or-change-the-status)).
 <Aside type="caution">
 `adults` must be from 1 to 999, `children` from 0 to 999 (`400 VALIDATION_ERROR` otherwise). A reservation can only be created if the restaurant has availability for the requested time slot. If there is no availability, the API returns `400` with the code `SLOT_UNAVAILABLE`. If the slot requires a prepayment (only when the restaurant takes payments), the API returns `400` with the code `PAYMENT_REQUIRED`: payments are not supported by the API yet. [Bookable slots](/partnership-documentation/guides/06-read-availabilities#bookable-slots) never list such slots. The `message` names the slot, for example: `No table is available for 4 guests on 2026-05-12T18:00:00Z. Read the availabilities and choose another time slot.`
@@ -147,7 +149,7 @@ Barestho assigns the tables automatically. You can guide it:
 
 ## Update a Reservation
 
-You can change `start_time`, `adults`, `children` and `metadata`. Send only the fields to change:
+You can change `start_time`, `adults`, `children`, `metadata` and `special_option_ids` (replaces the special options of the reservation). Send only the fields to change:
 
 ```http
 PATCH /api/v1/partnership/restaurants/:restaurant_id/reservations/:id/ HTTP/1.1

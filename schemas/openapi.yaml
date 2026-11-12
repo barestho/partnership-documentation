@@ -370,6 +370,376 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 
+  /api/v1/partnership/restaurants/{restaurant_pk}/special-options/categories/:
+    get:
+      operationId: restaurants_special_option_categories_list
+      summary: List a restaurant's special option categories
+      description: >
+        Returns the categories of special options (allergies, type of meal…) with their options, active or not. Deleted ones are not listed.
+
+        **Required scope:** none, any access granted by the restaurant.
+      parameters:
+        - $ref: '#/components/parameters/RestaurantPk'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - name: active
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Active or inactive categories only.
+        - name: required
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Required categories only, or the others.
+        - name: search
+          in: query
+          required: false
+          description: Case-insensitive search on the label.
+          schema:
+            type: string
+        - name: ordering
+          in: query
+          required: false
+          description: 'Sort field, `-` prefix for descending. One of: `id`, `label`.'
+          schema:
+            type: string
+      tags:
+        - Restaurant settings
+      responses:
+        '200':
+          description: A paginated list of special option categories.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PartnerSpecialOptionCategory'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    post:
+      operationId: restaurants_special_option_categories_create
+      summary: Create a special option category
+      description: >
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+        Accepts an `Idempotency-Key` header.
+      parameters:
+        - $ref: '#/components/parameters/RestaurantPk'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      tags:
+        - Restaurant settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerSpecialOptionCategory'
+      responses:
+        '201':
+          description: The new special option category.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerSpecialOptionCategory'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '409':
+          $ref: '#/components/responses/IdempotencyKeyInProgress'
+
+  /api/v1/partnership/restaurants/{restaurant_pk}/special-options/categories/{id}/:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantPk'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: restaurants_special_option_categories_retrieve
+      summary: Retrieve a special option category
+      description: >
+        **Required scope:** none, any access granted by the restaurant.
+      tags:
+        - Restaurant settings
+      responses:
+        '200':
+          description: The special option category.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerSpecialOptionCategory'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    patch:
+      operationId: restaurants_special_option_categories_partial_update
+      summary: Update a special option category
+      description: >
+        Send only the fields to change.
+
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+      tags:
+        - Restaurant settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerSpecialOptionCategory'
+      responses:
+        '200':
+          description: The updated special option category.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerSpecialOptionCategory'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    delete:
+      operationId: restaurants_special_option_categories_destroy
+      summary: Delete a special option category
+      description: >
+        Soft delete: the category and its options disappear from the lists and can no
+        longer be chosen. The reservations keep the options they chose.
+
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+      tags:
+        - Restaurant settings
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+
+  /api/v1/partnership/restaurants/{restaurant_pk}/special-options/:
+    get:
+      operationId: restaurants_special_options_list
+      summary: List a restaurant's special options
+      description: >
+        Returns the special options of every category, active or not. Choose them on a reservation with `special_option_ids`. Deleted ones are not listed.
+
+        **Required scope:** none, any access granted by the restaurant.
+      parameters:
+        - $ref: '#/components/parameters/RestaurantPk'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - name: category_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Options of this category only.
+        - name: active
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Active or inactive options only.
+        - name: search
+          in: query
+          required: false
+          description: Case-insensitive search on the label.
+          schema:
+            type: string
+        - name: ordering
+          in: query
+          required: false
+          description: 'Sort field, `-` prefix for descending. One of: `id`, `label`.'
+          schema:
+            type: string
+      tags:
+        - Restaurant settings
+      responses:
+        '200':
+          description: A paginated list of special options.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PartnerSpecialOption'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    post:
+      operationId: restaurants_special_options_create
+      summary: Create a special option
+      description: >
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+        Accepts an `Idempotency-Key` header.
+      parameters:
+        - $ref: '#/components/parameters/RestaurantPk'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      tags:
+        - Restaurant settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerSpecialOption'
+      responses:
+        '201':
+          description: The new special option.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerSpecialOption'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '409':
+          $ref: '#/components/responses/IdempotencyKeyInProgress'
+
+  /api/v1/partnership/restaurants/{restaurant_pk}/special-options/{id}/:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantPk'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: restaurants_special_options_retrieve
+      summary: Retrieve a special option
+      description: >
+        **Required scope:** none, any access granted by the restaurant.
+      tags:
+        - Restaurant settings
+      responses:
+        '200':
+          description: The special option.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerSpecialOption'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    patch:
+      operationId: restaurants_special_options_partial_update
+      summary: Update a special option
+      description: >
+        Send only the fields to change.
+
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+      tags:
+        - Restaurant settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerSpecialOption'
+      responses:
+        '200':
+          description: The updated special option.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerSpecialOption'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    delete:
+      operationId: restaurants_special_options_destroy
+      summary: Delete a special option
+      description: >
+        Soft delete: the special option disappears from the lists and can no longer be chosen,
+        but the reservations that chose it keep it.
+
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+      tags:
+        - Restaurant settings
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+
   /api/v1/partnership/restaurants/{restaurant_pk}/zones/:
     get:
       operationId: restaurants_zones_list
@@ -1932,6 +2302,8 @@ components:
         - reservations:read_all
         - reservations:manage
         - tables:read
+        - restaurant:read
+        - restaurant:manage
     # -------------------------------------------------------------------------
     # ReservationSource
     # -------------------------------------------------------------------------
@@ -2436,6 +2808,15 @@ components:
           type: boolean
           readOnly: true
           description: A guest has reduced mobility.
+        special_option_ids:
+          type: array
+          writeOnly: true
+          description: >
+            Ids of the special options to choose (see `/special-options/`). Each option must
+            be active, in an active category, and a category with `unique_choice` takes one
+            option at most. Required categories are not enforced.
+          items:
+            type: integer
         special_options:
           type: array
           readOnly: true
@@ -2616,6 +2997,107 @@ components:
         updated_at: '2026-05-01T08:00:00Z'
 
     # -------------------------------------------------------------------------
+    # PartnerSpecialOptionCategory
+    # -------------------------------------------------------------------------
+    PartnerSpecialOptionCategory:
+      type: object
+      description: A category of special options set by the restaurant.
+      required:
+        - label
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        label:
+          type: string
+          maxLength: 40
+          description: Label shown to the guest, e.g. `Allergies`.
+        description:
+          type: string
+          nullable: true
+          maxLength: 255
+        required:
+          type: boolean
+          default: false
+          description: >
+            The booking widget requires a choice in this category. Not enforced on the
+            reservations created by partners.
+        unique_choice:
+          type: boolean
+          default: false
+          description: One option at most can be chosen in this category.
+        active:
+          type: boolean
+          default: true
+          description: An inactive category and its options cannot be chosen.
+        options:
+          type: array
+          readOnly: true
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              label:
+                type: string
+              message:
+                type: string
+                nullable: true
+              active:
+                type: boolean
+      example:
+        id: 2
+        label: Allergies
+        description: Tell us about your allergies.
+        required: false
+        unique_choice: false
+        active: true
+        options:
+          - id: 7
+            label: Gluten
+            message: null
+            active: true
+    # -------------------------------------------------------------------------
+    # PartnerSpecialOption
+    # -------------------------------------------------------------------------
+    PartnerSpecialOption:
+      type: object
+      description: A special option of a category.
+      required:
+        - category_id
+        - label
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        category_id:
+          type: integer
+          description: Category of the option. Set at the creation, cannot change.
+        category_label:
+          type: string
+          readOnly: true
+        label:
+          type: string
+          maxLength: 40
+          description: Label shown to the guest, e.g. `Gluten`.
+        message:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Message shown to the guest when the option is chosen.
+        active:
+          type: boolean
+          default: true
+          description: An inactive option cannot be chosen.
+      example:
+        id: 7
+        category_id: 2
+        category_label: Allergies
+        label: Gluten
+        message: null
+        active: true
+
+    # -------------------------------------------------------------------------
     # PartnerReservationSpecialOption
     # -------------------------------------------------------------------------
     PartnerReservationSpecialOption:
@@ -2672,6 +3154,13 @@ components:
           description: >
             Your own key-value pairs. Replaces the stored value. At most 4 KB as compact JSON.
             **Never put sensitive data here:** every partner that reads the reservation sees it.
+        special_option_ids:
+          type: array
+          description: >
+            Ids of the special options of the reservation: replaces the current ones. An
+            empty list removes them. Same rules as at the creation.
+          items:
+            type: integer
       example:
         start_time: '2026-05-12T20:30:00+02:00'
         adults: 4
