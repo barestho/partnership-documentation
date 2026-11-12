@@ -740,6 +740,195 @@ paths:
           $ref: '#/components/responses/RateLimited'
 
 
+  /api/v1/partnership/restaurants/{restaurant_pk}/opening-hours/:
+    get:
+      operationId: restaurants_opening_hours_list
+      summary: List a restaurant's opening hours
+      description: >
+        Returns the opening hours shown to the guests, sorted by `weekday` then `from_hour`.
+        They do not change the availabilities. Times are in the local time of the
+        restaurant (see its `timezone`), not in UTC: they repeat every week.
+
+        **Required scope:** none, any access granted by the restaurant.
+      parameters:
+        - $ref: '#/components/parameters/RestaurantPk'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - name: weekday
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 6
+          description: Opening hours of this day only, `0` is Monday.
+        - name: ordering
+          in: query
+          required: false
+          description: 'Sort fields, `-` prefix for descending. Default: `weekday,from_hour`. Also `id`.'
+          schema:
+            type: string
+      tags:
+        - Restaurant settings
+      responses:
+        '200':
+          description: A paginated list of opening hours.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PartnerOpeningHours'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    post:
+      operationId: restaurants_opening_hours_create
+      summary: Create opening hours
+      description: >
+        A range cannot go past midnight, nor overlap another range of the same day.
+
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+        Accepts an `Idempotency-Key` header.
+      parameters:
+        - $ref: '#/components/parameters/RestaurantPk'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      tags:
+        - Restaurant settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerOpeningHours'
+      responses:
+        '201':
+          description: The new opening hours.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerOpeningHours'
+        '400':
+          description: >
+            `VALIDATION_ERROR`: a field is invalid, `from_hour` is not before `to_hour`,
+            or the range overlaps another range of the same day (named in `message`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '409':
+          $ref: '#/components/responses/IdempotencyKeyInProgress'
+
+  /api/v1/partnership/restaurants/{restaurant_pk}/opening-hours/{id}/:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantPk'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: restaurants_opening_hours_retrieve
+      summary: Retrieve opening hours
+      description: >
+        **Required scope:** none, any access granted by the restaurant.
+      tags:
+        - Restaurant settings
+      responses:
+        '200':
+          description: The opening hours.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerOpeningHours'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    patch:
+      operationId: restaurants_opening_hours_partial_update
+      summary: Update opening hours
+      description: >
+        Send only the fields to change. Same checks as at the creation.
+
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+      tags:
+        - Restaurant settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerOpeningHours'
+      responses:
+        '200':
+          description: The updated opening hours.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerOpeningHours'
+        '400':
+          description: >
+            `VALIDATION_ERROR`: a field is invalid, `from_hour` is not before `to_hour`,
+            or the range overlaps another range of the same day (named in `message`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    delete:
+      operationId: restaurants_opening_hours_destroy
+      summary: Delete opening hours
+      description: >
+        Deletes the range for good.
+
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+      tags:
+        - Restaurant settings
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
   /api/v1/partnership/restaurants/{restaurant_pk}/zones/:
     get:
       operationId: restaurants_zones_list
@@ -2302,7 +2491,6 @@ components:
         - reservations:read_all
         - reservations:manage
         - tables:read
-        - restaurant:read
         - restaurant:manage
     # -------------------------------------------------------------------------
     # ReservationSource
@@ -2996,6 +3184,40 @@ components:
         created_at: '2026-05-01T08:00:00Z'
         updated_at: '2026-05-01T08:00:00Z'
 
+    # -------------------------------------------------------------------------
+    # PartnerOpeningHours
+    # -------------------------------------------------------------------------
+    PartnerOpeningHours:
+      type: object
+      description: >
+        A range of opening hours, in the local time of the restaurant. A range cannot go
+        past midnight.
+      required:
+        - weekday
+        - from_hour
+        - to_hour
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        weekday:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: Day of the week, `0` is Monday and `6` is Sunday.
+        from_hour:
+          type: string
+          example: '11:30:00'
+          description: Opening time, `HH:MM:SS`, local time.
+        to_hour:
+          type: string
+          example: '14:30:00'
+          description: Closing time, `HH:MM:SS`, local time. After `from_hour`.
+      example:
+        id: 3
+        weekday: 0
+        from_hour: '11:30:00'
+        to_hour: '14:30:00'
     # -------------------------------------------------------------------------
     # PartnerSpecialOptionCategory
     # -------------------------------------------------------------------------

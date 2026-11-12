@@ -3,22 +3,11 @@ title: ⚙️ Configure the Restaurant
 ---
 import { Aside } from '@astrojs/starlight/components';
 
-A restaurant may let you change its configuration. These scopes give access to it:
-
-| Scope | Gives access to |
-|---|---|
-| `restaurant:read` | Read the configuration of the restaurant. No route needs it yet: the special options can be read without any scope |
-| `restaurant:manage` | Change the configuration of the restaurant |
-
-Every change needs a read and write API key. See [Permissions](/partnership-documentation/guides/04-list-restaurants#permissions-scopes).
+Any access granted by the restaurant lets you **read** its configuration, without any scope. **Changing** it needs the `restaurant:manage` scope and a read and write API key. See [Permissions](/partnership-documentation/guides/04-list-restaurants#permissions-scopes).
 
 ## Special Options
 
 Special options are the choices a guest makes when booking: allergies, type of meal, occasion… The restaurant groups them in **categories**.
-
-<Aside type="note">
-Reading the special options needs no scope: any access granted by the restaurant is enough, so that you can choose options on your reservations. Changing them needs `restaurant:manage`.
-</Aside>
 
 ### Categories
 
@@ -105,3 +94,38 @@ Send `special_option_ids` when you [create](/partnership-documentation/guides/05
 - A category with `unique_choice` takes one option at most. Otherwise: `400 VALIDATION_ERROR`.
 - The `required` categories are not enforced on your reservations.
 - On a `PATCH`, the list replaces the options of the reservation. An empty list removes them. Without `special_option_ids`, they do not change.
+
+## Opening Hours
+
+The opening hours tell the guests when the restaurant is open. They are shown in the booking widget only: **they do not change the availabilities**, which come from the services of the restaurant.
+
+```
+GET    /api/v1/partnership/restaurants/:restaurant_id/opening-hours/
+POST   /api/v1/partnership/restaurants/:restaurant_id/opening-hours/
+GET    /api/v1/partnership/restaurants/:restaurant_id/opening-hours/:id/
+PATCH  /api/v1/partnership/restaurants/:restaurant_id/opening-hours/:id/
+DELETE /api/v1/partnership/restaurants/:restaurant_id/opening-hours/:id/
+```
+
+```json
+{ "id": 3, "weekday": 0, "from_hour": "11:30:00", "to_hour": "14:30:00" }
+```
+
+| Field | Content |
+|---|---|
+| `weekday` | Day of the week: `0` is Monday, `6` is Sunday |
+| `from_hour` | Opening time, `HH:MM:SS` |
+| `to_hour` | Closing time, `HH:MM:SS`. Must be after `from_hour` |
+
+A day can have several ranges, e.g. lunch and dinner. The list is sorted by `weekday`, then `from_hour`. Filter it with `?weekday=`.
+
+<Aside type="caution">
+**Local time, not UTC.** The opening hours repeat every week: they are in the local time of the restaurant (see its `timezone`), unlike the other dates and times of the API. `19:00:00` stays 19:00 in summer and in winter.
+</Aside>
+
+- A range cannot go past midnight: `from_hour` must be before `to_hour`. For 19:00 to 01:00, create `19:00:00`–`23:59:59` on the first day and `00:00:00`–`01:00:00` on the next one.
+- Two ranges of the same day cannot overlap.
+- Otherwise: `400 VALIDATION_ERROR`, with a `message` that names the overlapping range.
+- `DELETE` removes the range for good and answers `204`.
+- The creations accept an `Idempotency-Key` header.
+

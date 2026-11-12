@@ -72,8 +72,7 @@ Each restaurant grants you a set of **scopes**, listed in `access.scopes`. Each 
 | `reservations:read_all` | Read **every** reservation of the restaurant, from all channels |
 | `reservations:manage` | Update any reservation and change its status |
 | `tables:read` | Tables, [best tables](/partnership-documentation/guides/06-read-availabilities#find-the-best-tables) of a time slot |
-| `restaurant:read` | Read the configuration of the restaurant (see [Configure the Restaurant](/partnership-documentation/guides/07-configure-the-restaurant)). Not needed by any route yet |
-| `restaurant:manage` | Change the configuration of the restaurant: special options… |
+| `restaurant:manage` | Change the configuration of the restaurant: special options, opening hours… (see [Configure the Restaurant](/partnership-documentation/guides/07-configure-the-restaurant)). Reading it needs no scope |
 
 By default, you get `availabilities:read` and `reservations:write_own`. A restaurant may grant you more, for example `reservations:manage` for a POS. Scopes are set per restaurant: always read `access.scopes` of the restaurant you work with.
 
