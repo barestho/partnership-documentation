@@ -41,11 +41,33 @@ Hidden reservations are never returned. Useful filters (query parameters):
 | Filter | Example |
 |---|---|
 | Status marks | `?confirmed=true`, `?cancelled=false`, `?arrived=true`, `?no_show=true` |
-| Guest | `?last_name__iexact=weissnat`, `?email__iexact=k@example.com` |
-| Day | `?start_time__date=2026-05-12`, `?start_time__date__gte=2026-05-01` (same for `created_at` and `updated_at`) |
+| Guest | `?first_name=Jane`, `?last_name__iexact=weissnat`, `?email__iexact=k@example.com` |
+| UTC day | `?start_time__date=2026-05-12`, `?start_time__date__gte=2026-05-01`; also `__gt`, `__lt` and `__lte` (same for `created_at` and `updated_at`) |
+| Date and time | `?updated_at__gte=2026-05-12T18:00:00Z`; also `__gt`, `__lt` and `__lte` (same for `start_time` and `created_at`). The timezone is required: `Z` or an offset such as `+02:00` |
 | Channel | `?source=GOOGLE`, `?initiator_partner_name=Acme%20Booking` |
 | Metadata | `?metadata.booking_ref=BK-1042`: any key of `metadata`, text values only |
-| Sort | `?ordering=-start_time` |
+| Search | `?search=doe`: first name, last name or email of the guest, case-insensitive |
+| Sort | `?ordering=-start_time`, several fields: `?ordering=updated_at,id` |
+
+Days are UTC days: `?start_time__date=2026-05-12` covers 2026-05-12T00:00:00Z to 2026-05-13T00:00:00Z. Unknown query parameters are ignored: a misspelled filter returns every reservation.
+
+<Aside type="caution">
+**Breaking change:** the day filters (`__date…`) used the day in Brussels time. They now use the UTC day, like every date and time of the API.
+</Aside>
+
+### Incremental Sync
+
+Webhooks may arrive late or not at all (see [Delivery and Retries](/partnership-documentation/guides/02-creating-webhooks#delivery-and-retries)). To catch up, read the reservations changed since your last sync:
+
+```http
+GET /api/v1/partnership/restaurants/:restaurant_id/reservations/?updated_at__gte=2026-05-12T18:00:00.123456Z&ordering=updated_at,id HTTP/1.1
+```
+
+1. Keep the greatest `updated_at` you received, per restaurant.
+2. Next time, send it in `updated_at__gte`, with `ordering=updated_at,id` for a stable order across pages.
+3. Read every page (`next`), and store each reservation by restaurant and `id`. A reservation you already hold with the same `updated_at` comes back: `__gte` does not miss two reservations changed at the same moment.
+
+Every change of a reservation updates its `updated_at`, whoever made it: the restaurant, the customer or you.
 
 Each reservation also gives:
 
@@ -53,8 +75,12 @@ Each reservation also gives:
 - `initiator_partner_name`: the partner that created the reservation, `null` for other channels.
 - `last_cancellable_at`: the last moment a booking channel can cancel it (see [Cancellation Deadline](#cancellation-deadline)).
 
+<Aside type="caution">
+A reservation `id` is unique **within its restaurant** only: two restaurants can have a reservation with the same `id`. Key your reservations by restaurant **and** `id`.
+</Aside>
+
 <Aside type="danger">
-Never put sensitive data (health, payment, passwords…) in `metadata`. Every partner that reads the reservation sees it.
+Never put sensitive data (health, payment, passwords…) in `metadata`. Every partner that reads the reservation sees it. `metadata` is limited to 4 KB as JSON (`400 VALIDATION_ERROR` otherwise).
 </Aside>
 
 ### Create a Reservation
@@ -84,8 +110,25 @@ Content-Type: application/json
 
 A successful creation returns `201 Created` with the full reservation. The statuses (`confirmed`, `cancelled`, `arrived`, `no_show`, their dates and `confirmation_mode`) are read-only: Barestho sets them. Change them with `action` (see [Cancel or Change the Status](#cancel-or-change-the-status)).
 <Aside type="caution">
-A reservation can only be created if the restaurant has availability for the requested time slot. If there is no availability, the API returns `400` with the code `SLOT_UNAVAILABLE`. If the slot requires a prepayment, the API returns `400` with the code `PAYMENT_REQUIRED`: payments are not supported by the API yet. The `message` names the slot, for example: `No table is available for 4 guests on 2026-05-12 at 20:00. Read the availabilities and choose another time slot.`
+`adults` must be from 1 to 999, `children` from 0 to 999 (`400 VALIDATION_ERROR` otherwise). A reservation can only be created if the restaurant has availability for the requested time slot. If there is no availability, the API returns `400` with the code `SLOT_UNAVAILABLE`. If the slot requires a prepayment (only when the restaurant takes payments), the API returns `400` with the code `PAYMENT_REQUIRED`: payments are not supported by the API yet. [Bookable slots](/partnership-documentation/guides/06-read-availabilities#bookable-slots) never list such slots. The `message` names the slot, for example: `No table is available for 4 guests on 2026-05-12T18:00:00Z. Read the availabilities and choose another time slot.`
 </Aside>
+
+### Retry Safely
+
+A network error or a timeout does not tell you whether the reservation was created. To retry without creating it twice, send an `Idempotency-Key` header: any unique value of 1 to 255 characters, such as a UUID you generate for this reservation. The same header works for the updates and the status actions (see [Cancel or Change the Status](#cancel-or-change-the-status)).
+
+```http
+POST /api/v1/partnership/restaurants/:restaurant_id/reservations/ HTTP/1.1
+Idempotency-Key: 5f0c7b1e-8a43-4d6e-9f0a-2b7c1d9e4a10
+```
+
+- Send the **same key with the same request** to retry: the reservation is created once. A retry after a success returns the first response again, with the header `Idempotent-Replayed: true`.
+- A key is kept **24 hours** after a success, for your partner account. After that, it is a new key.
+- A failed request (any error) does not keep the key: fix the request and retry with the same key.
+- The same key with another request (other body or query parameters) returns `400 IDEMPOTENCY_KEY_REUSED`. Spaces and key order in the JSON do not matter.
+- The same key while the first request still runs returns `409 IDEMPOTENCY_KEY_IN_PROGRESS`. Wait a few seconds, then retry.
+
+The header is optional. Without it, each request creates a reservation.
 
 ### Choose the Zone or the Tables
 
@@ -119,6 +162,10 @@ Content-Type: application/json
 ```
 
 - A new time slot or party size is checked against the availabilities. No free table: `400 SLOT_UNAVAILABLE`.
+- A new time slot or party size that requires a prepayment returns `400 PAYMENT_REQUIRED`, as at the creation.
+- A past `start_time`, or one too close to the restaurant's minimum booking delay, has no free table: `400 SLOT_UNAVAILABLE`.
+- `adults` must be from 1 to 999, `children` from 0 to 999. Otherwise: `400 VALIDATION_ERROR`.
+- The cancellation deadline does not apply: you can move a reservation after it.
 - The reservation must come from a partner, be confirmed, not cancelled and not past. Otherwise: `400 VALIDATION_ERROR`, with the reason in `message`.
 - The status cannot change with this request: use `action` (below).
 
@@ -152,6 +199,8 @@ With `action`, the request body is ignored.
 - An unknown `action` returns `400 VALIDATION_ERROR`. The `message` lists the supported actions.
 - An action the current status does not allow returns `400 INVALID_STATUS_TRANSITION`. The `message` gives the current status, for example: `This reservation cannot be cancelled. Current status: confirmed, arrived.`
 
+A retried action may have been applied already: without precaution, the retry returns `INVALID_STATUS_TRANSITION`. Send an `Idempotency-Key` header (a new one per action): a retry with the same key returns the first response again, with `Idempotent-Replayed: true`. See [Retry Safely](#retry-safely).
+
 ### Cancellation Deadline
 
 A restaurant can set a cancellation deadline (for example, 24 hours before the reservation). After it, a booking channel cannot cancel anymore: the API returns `400 CANCELLATION_DEADLINE_PASSED`, and the guest must contact the restaurant.
@@ -162,13 +211,26 @@ The deadline does not apply to a restaurant's own tools (`CLIENT` partners): the
 
 ## Webhook Events
 
-The following events can be received on your webhooks regarding your reservations:
+You receive the events of:
+
+- the reservations **you created**;
+- **every** reservation of the restaurant, from all channels (phone, website, Google…), when your access holds `reservations:read_all`. Each event is sent once, even if you created the reservation.
+
+Events are sent while the restaurant grants you access. Once the restaurant revokes your access, no more event is sent for its reservations.
 
 | Event | Trigger |
 |---|---|
-| `RESERVATION_CONFIRMED` | The restaurant has manually confirmed the reservation |
-| `RESERVATION_MODIFIED` | The reservation has been modified by the restaurant or the customer |
-| `RESERVATION_CANCELLED` | The reservation has been cancelled by the partner, the restaurant, or the customer |
+| `RESERVATION_CREATED` | A reservation is created, from any channel |
+| `RESERVATION_CONFIRMED` | The reservation is confirmed: at the creation when the restaurant confirms right away (`CONFIRMATION_MODE_SYNCHRONOUS`), or later when a pending reservation is confirmed (by the restaurant, or with `?action=confirm`) |
+| `RESERVATION_MODIFIED` | `start_time`, `adults` or `children` changed, whoever changed it: the restaurant, the customer, or your own `PATCH`. A change of `metadata` only sends no event |
+| `RESERVATION_CANCELLED` | The reservation is cancelled, whoever cancelled it: you, the restaurant, or the customer |
+| `RESERVATION_ARRIVED` | The guest is marked as arrived (by the restaurant, or with `?action=mark_as_arrived`) |
+| `RESERVATION_NO_SHOW` | The guest is marked as absent (by the restaurant, or with `?action=mark_as_no_show`) |
+| `RESERVATION_MARKERS_RESET` | The arrived or no-show mark is removed (by the restaurant, or with `?action=reset_markers`) |
+
+- A reservation confirmed right away at its creation sends `RESERVATION_CREATED` **and** `RESERVATION_CONFIRMED`. The events may arrive in any order: sort them with `reservation.updated_at`.
+- `reservation.source` and `reservation.initiator_partner_name` tell your own reservations apart from the other channels.
+- New events may be added. A webhook with `subscribed_events: null` receives them: ignore the events you do not handle, and answer `2xx`.
 
 <Aside type="note">
 These events allow you to maintain the status of your reservations in real-time without having to continuously poll the API.

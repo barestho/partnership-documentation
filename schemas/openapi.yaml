@@ -34,7 +34,14 @@ info:
 
     - **Rate limiting:** 60 requests per minute per partner, over a sliding window.
     Every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
-    `X-RateLimit-Reset`. A `429` response also carries `Retry-After`.
+    `X-RateLimit-Reset`. A `429` response also carries `Retry-After`. After 20 failed
+    authentications in 15 minutes, an IP address gets `429` until the end of the window.
+
+    - **Dates and times:** every datetime is in UTC (`2026-05-12T18:00:00Z`). Send yours
+    with a timezone. Durations use `HH:MM:SS`.
+
+    - **Retry safely:** send an `Idempotency-Key` header with the reservation creation and
+    updates. A retry with the same key returns the first response.
 
     - **Request id:** every response carries an `X-Request-Id` header. Quote it when
     you contact support.
@@ -67,12 +74,25 @@ paths:
         Returns all restaurants accessible to the authenticated partner.
         Use this endpoint to discover which restaurants are linked to your
         partner account before querying their reservations or availabilities.
-        Only active restaurants that granted access to the partner are listed.
+        Only the restaurants that granted access to the partner are listed, plus
+        every linked restaurant for a `CLIENT` partner.
       tags:
         - Restaurants
       parameters:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Offset'
+        - name: search
+          in: query
+          required: false
+          description: 'Case-insensitive search on the internal `name` and `schema_name` of the restaurant. `display_name` cannot be searched.'
+          schema:
+            type: string
+        - name: ordering
+          in: query
+          required: false
+          description: 'Sort field, `-` prefix for descending, e.g. `-id`. One of: `id`.'
+          schema:
+            type: string
       responses:
         '200':
           description: A paginated list of restaurants associated with the partner account.
@@ -103,9 +123,9 @@ paths:
         Useful for refreshing cached restaurant data or retrieving location and
         timezone information before booking a reservation.
 
-        Returns `404` when the restaurant does not exist, is inactive, or is not
-        linked to the partner, and `403 RESTAURANT_ACCESS_DENIED` when the
-        restaurant has not granted access.
+        Returns `404` when the restaurant does not exist or is not linked to the
+        partner, and `403 RESTAURANT_ACCESS_DENIED` when the restaurant has not
+        granted access.
       parameters:
         - name: id
           in: path
@@ -140,6 +160,18 @@ paths:
         per date between `from_datetime` and `to_datetime`. Query it before creating
         a reservation. See the "Read Availabilities" guide for the meaning of each field.
 
+        **Zones:** with at least two public zones, the keys of the `availability` object
+        are the zone ids, public or not. Only a zone whose `is_public` is `true` is accepted
+        as `zone_id` at the creation. With fewer than two public zones, every zone is summed
+        under the key `0`: create the reservation without `zone_id`.
+
+
+        **Prepayment:** the party sizes that need a prepayment are removed, since the API
+        cannot take payments.
+
+
+        To know when a party can book, prefer `GET /availabilities/slots/`.
+
         **Required scope:** `availabilities:read`. The restaurant reservation module
         must be enabled, otherwise `403 MODULE_DISABLED`.
       parameters:
@@ -159,7 +191,10 @@ paths:
         - name: to_datetime
           in: query
           required: true
-          description: The date and time to which availabilities will be calculated.
+          description: >
+            The date and time to which availabilities will be calculated. At most
+            31 days after `from_datetime`, otherwise `400 VALIDATION_ERROR`:
+            split a longer range into several requests.
           schema:
             type: string
             format: date-time
@@ -172,6 +207,158 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PartnerRestaurantAvailabilities'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/v1/partnership/restaurants/{id}/availabilities/slots/:
+    get:
+      operationId: restaurants_availabilities_slots_retrieve
+      summary: List the bookable slots of a party size
+      description: >
+        Returns the start times that can be booked now for `party_size` guests, as a
+        flat list sorted by time, in UTC. A slot is listed when its shift is active, no
+        booking limit is reached, `last_bookable_at` is not passed, and a table is free
+        for the party without prepayment. Create the reservation with `start_time`.
+
+
+        `zone_ids` lists the public zones with a free table, usable as `zone_id`. It is
+        empty when the restaurant has fewer than two public zones, or when only a non-public
+        zone is free: create the reservation without `zone_id`.
+
+
+        **Required scope:** `availabilities:read`. The restaurant reservation module
+        must be enabled, otherwise `403 MODULE_DISABLED`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the restaurant.
+          schema:
+            type: string
+        - name: from_datetime
+          in: query
+          required: true
+          description: Start of the range, with a timezone.
+          schema:
+            type: string
+            format: date-time
+          example: '2026-05-01T00:00:00Z'
+        - name: to_datetime
+          in: query
+          required: true
+          description: >
+            End of the range. At most 31 days after `from_datetime`, otherwise
+            `400 VALIDATION_ERROR`: split a longer range into several requests.
+          schema:
+            type: string
+            format: date-time
+          example: '2026-05-31T23:59:59Z'
+        - name: party_size
+          in: query
+          required: true
+          description: Number of guests, from 1 to 999.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 999
+      tags:
+        - Restaurants
+      responses:
+        '200':
+          description: The bookable slots.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerRestaurantAvailabilitySlots'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/v1/partnership/restaurants/{id}/availabilities/best-tables/:
+    get:
+      operationId: restaurants_availabilities_best_tables_list
+      summary: Find the best tables for a time slot
+      description: >
+        Returns the tables Barestho would assign to a reservation of `guests` guests,
+        from `start_time` and for `duration`. It is the assignment used when you create
+        a reservation without `tables`. An empty list means that no table is free.
+        The list is not paginated.
+
+
+        With `greedy=true` (`CLIENT` partners only), the restaurant's services are ignored: any time of the day
+        is open, without booking limits nor minimum booking delay.
+
+
+        **Required scope:** `tables:read`. The restaurant reservation module must be
+        enabled, otherwise `403 MODULE_DISABLED`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The unique identifier of the restaurant.
+          schema:
+            type: string
+        - name: start_time
+          in: query
+          required: true
+          description: Start of the time slot.
+          schema:
+            type: string
+            format: date-time
+        - name: guests
+          in: query
+          required: true
+          description: Number of guests, from 1 to 999.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 999
+        - name: duration
+          in: query
+          required: true
+          description: Duration of the reservation, e.g. `02:00:00`. More than 0 and at most 12 hours.
+          schema:
+            type: string
+            example: '02:00:00'
+        - name: zone_id
+          in: query
+          required: false
+          description: Keep only the tables of this zone.
+          schema:
+            type: integer
+        - name: greedy
+          in: query
+          required: false
+          description: '`CLIENT` partners only, `400 VALIDATION_ERROR` otherwise. Ignores the restaurant''s services, see the description.'
+          schema:
+            type: boolean
+            default: false
+      tags:
+        - Restaurants
+      responses:
+        '200':
+          description: The best tables for the time slot, possibly empty.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PartnerRestaurantTable'
         '400':
           $ref: '#/components/responses/ValidationError'
         '401':
@@ -208,6 +395,18 @@ paths:
           schema:
             type: boolean
           description: Active or inactive zones only.
+        - name: search
+          in: query
+          required: false
+          description: 'Case-insensitive search on the internal and public names of the zone.'
+          schema:
+            type: string
+        - name: ordering
+          in: query
+          required: false
+          description: 'Sort field, `-` prefix for descending, e.g. `-priority`. One of: `priority`, `id`.'
+          schema:
+            type: string
       tags:
         - Restaurants
       responses:
@@ -309,6 +508,18 @@ paths:
           schema:
             type: boolean
           description: Active or inactive tables only.
+        - name: search
+          in: query
+          required: false
+          description: 'Case-insensitive search on the table name and on the internal and public names of its zone.'
+          schema:
+            type: string
+        - name: ordering
+          in: query
+          required: false
+          description: 'Sort field, `-` prefix for descending, e.g. `-priority`. One of: `priority`, `id`, `name`, `seats`, `min_seats`, `type`, `zone`, `zone_name`.'
+          schema:
+            type: string
       tags:
         - Restaurants
       responses:
@@ -384,7 +595,15 @@ paths:
         `metadata` has this key with this text value, e.g. `?metadata.booking_ref=BK-1042`.
         Only text values match. The key cannot contain `__`.
 
-        `created_at` and `updated_at` support the same date filters as `start_time`.
+        **Dates and times are in UTC.** `start_time`, `created_at` and `updated_at` support:
+        `__date` (a UTC day, `YYYY-MM-DD`) with `__date__gt`, `__date__gte`, `__date__lt` and
+        `__date__lte`; and `__gt`, `__gte`, `__lt` and `__lte` with a date and time that
+        holds a timezone (`2026-05-12T18:00:00Z`; without timezone: `400 VALIDATION_ERROR`).
+
+
+        **Incremental sync:** `?updated_at__gte=<the last updated_at you hold>&ordering=updated_at,id`
+        returns the reservations changed since your last sync, in a stable order.
+        Unknown query parameters are ignored: check their spelling.
 
         Hidden reservations are never returned.
 
@@ -463,28 +682,85 @@ paths:
         - name: start_time__date
           in: query
           required: false
-          description: Reservations of this day.
+          description: Reservations of this UTC day.
           schema:
             type: string
             format: date
         - name: start_time__date__gte
           in: query
           required: false
-          description: Reservations from this day.
+          description: Reservations from this UTC day.
           schema:
             type: string
             format: date
         - name: start_time__date__lte
           in: query
           required: false
-          description: Reservations until this day.
+          description: Reservations until this UTC day.
           schema:
             type: string
             format: date
+        - name: first_name
+          in: query
+          required: false
+          description: Exact first name of the guest.
+          schema:
+            type: string
+        - name: start_time__date__gt
+          in: query
+          required: false
+          description: Reservations after this UTC day.
+          schema:
+            type: string
+            format: date
+        - name: start_time__date__lt
+          in: query
+          required: false
+          description: Reservations before this UTC day.
+          schema:
+            type: string
+            format: date
+        - name: created_at__date
+          in: query
+          required: false
+          description: Reservations created this UTC day. Also `created_at__date__gt`, `__gte`, `__lt` and `__lte`.
+          schema:
+            type: string
+            format: date
+        - name: updated_at__date
+          in: query
+          required: false
+          description: Reservations updated this UTC day. Also `updated_at__date__gt`, `__gte`, `__lt` and `__lte`.
+          schema:
+            type: string
+            format: date
+        - name: updated_at__gte
+          in: query
+          required: false
+          description: >
+            Reservations updated at or after this date and time, with a timezone.
+            Also `updated_at__gt`, `__lt` and `__lte`, and the same lookups on
+            `start_time` and `created_at`.
+          schema:
+            type: string
+            format: date-time
+          example: '2026-05-12T18:00:00Z'
+        - name: metadata.<key>
+          in: query
+          required: false
+          description: 'Text value of a `metadata` key, e.g. `metadata.booking_ref=BK-1042`. Replace `<key>` with the key, which cannot contain `__`.'
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          description: 'Case-insensitive search on the first name, last name and email of the guest.'
+          schema:
+            type: string
         - name: ordering
           in: query
           required: false
-          description: 'Sort field, `-` prefix for descending, e.g. `-start_time`. Also `created_at`, `updated_at`, `last_name`, `initiator_partner_name`…'
+          description: 'Sort fields, comma-separated, `-` prefix for descending, e.g. `-start_time` or `updated_at,id`. Also `created_at`, `last_name`, `initiator_partner_name`…'
           schema:
             type: string
       tags:
@@ -517,16 +793,22 @@ paths:
       summary: Create a restaurant reservation
       description: >
         Creates a new reservation for a guest at the specified restaurant if there is availability.
-        At minimum you must provide `start_time` and `adults`. The `confirmation_mode`
-        field determines whether the reservation is confirmed immediately
-        (`CONFIRMATION_MODE_SYNCHRONOUS`) or requires an asynchronous approval step
-        (`CONFIRMATION_MODE_ASYNCHRONOUS`).
+        At minimum you must provide `start_time` and `adults`. The restaurant's settings
+        decide the confirmation, read it in `confirmation_mode`: confirmed right away
+        (`CONFIRMATION_MODE_SYNCHRONOUS`), or waiting for the restaurant
+        (`CONFIRMATION_MODE_ASYNCHRONOUS`). Needs a read and write API key.
 
         **Tables:** Barestho assigns the tables automatically. Send `zone_id` to limit
         the assignment to one zone. `CLIENT` partners (the restaurant's own tools) can
         also choose the tables with `tables`, or use the `greedy` query parameter.
         Chosen tables are assigned without any availability check. Other partners
         get `400 VALIDATION_ERROR` if they send them.
+
+
+        **Retry safely:** send an `Idempotency-Key` header to retry without creating the
+        reservation twice. The same key with the same request returns the first response
+        again, with `Idempotent-Replayed: true`, for 24 hours after a success. A failed
+        request does not keep the key.
 
 
         **Required scope:** `reservations:write_own`. The restaurant reservation module
@@ -538,6 +820,7 @@ paths:
           description: The unique identifier of the restaurant where the reservation is to be created.
           schema:
             type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
         - name: greedy
           in: query
           required: false
@@ -568,34 +851,46 @@ paths:
                 booking_ref: BK-1042
       responses:
         '201':
-          description: The newly created reservation object.
+          description: >
+            The newly created reservation object. On a retry with the same
+            `Idempotency-Key`, the first response again.
+          headers:
+            Idempotent-Replayed:
+              $ref: '#/components/headers/IdempotentReplayed'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PartnerRestaurantReservation'
         '400':
           description: >
-            `VALIDATION_ERROR`: a field is missing or malformed. See `details`.
+            `VALIDATION_ERROR`: a field is missing or malformed (also an `Idempotency-Key`
+            that is empty or over 255 characters). See `details`.
             `SLOT_UNAVAILABLE`: no table is free for this time slot and party size.
             `PAYMENT_REQUIRED`: this time slot requires a prepayment, which the API does not support yet.
+            `IDEMPOTENCY_KEY_REUSED`: this `Idempotency-Key` was already used for another request
+            (other body or query parameters). Use a new key.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
                 code: SLOT_UNAVAILABLE
-                message: No table is available for 2 guests on 2026-05-12 at 20:00. Read the availabilities and choose another time slot.
+                message: No table is available for 2 guests on 2026-05-12T18:00:00Z. Read the availabilities and choose another time slot.
                 details: []
                 request_id: req_8f2c1e0b7a4d4c3e9b1f2a6d5c7e8f90
-                timestamp: '2026-05-01T10:00:00+00:00'
+                timestamp: '2026-05-01T10:00:00Z'
         '401':
           $ref: '#/components/responses/AuthenticationFailed'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyKeyInProgress'
         '429':
           $ref: '#/components/responses/RateLimited'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
 
   /api/v1/partnership/restaurants/{restaurant_pk}/reservations/{id}/:
     get:
@@ -643,7 +938,9 @@ paths:
       description: >
         Without `action`: partially updates a reservation. Only `start_time`, `adults`,
         `children` and `metadata` can change. A new time slot or party size is checked
-        against the availabilities. The reservation must come from a partner, be
+        against the availabilities and the prepayment rules, as at the creation: a past
+        time slot has no free table. `adults` must be at least 1. The cancellation
+        deadline does not apply to a move. The reservation must come from a partner, be
         confirmed, not cancelled and not past.
 
 
@@ -655,9 +952,15 @@ paths:
         deadline (`CANCELLATION_DEADLINE_PASSED`).
 
 
+        **Retry safely:** send an `Idempotency-Key` header. A retry with the same key
+        returns the first response again, with `Idempotent-Replayed: true`, instead of
+        `INVALID_STATUS_TRANSITION` for an action already applied. Kept 24 hours after a
+        success. A failed request does not keep the key.
+
+
         **Required scope:** `reservations:write_own` for your own reservations,
         `reservations:manage` for the others (otherwise `403 NOT_RESERVATION_OWNER`).
-        Every `action` but `cancel` needs `reservations:manage`.
+        Every `action` but `cancel` needs `reservations:manage`. Needs a read and write API key.
       parameters:
         - name: id
           in: path
@@ -665,6 +968,7 @@ paths:
           description: The unique identifier of the reservation to update.
           schema:
             type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
         - name: restaurant_pk
           in: path
           required: true
@@ -695,7 +999,12 @@ paths:
               $ref: '#/components/schemas/PartnerRestaurantReservationUpdate'
       responses:
         '200':
-          description: The updated reservation object.
+          description: >
+            The updated reservation object. On a retry with the same
+            `Idempotency-Key`, the first response again.
+          headers:
+            Idempotent-Replayed:
+              $ref: '#/components/headers/IdempotentReplayed'
           content:
             application/json:
               schema:
@@ -706,8 +1015,11 @@ paths:
             updated (not from a partner, not confirmed, cancelled or past), or `action` is
             unknown. See `message`.
             `SLOT_UNAVAILABLE`: the new time slot or party size has no free table.
+            `PAYMENT_REQUIRED`: the new time slot or party size requires a prepayment.
             `INVALID_STATUS_TRANSITION`: the current status does not allow the `action`.
             `CANCELLATION_DEADLINE_PASSED`: the cancellation deadline has passed.
+            `IDEMPOTENCY_KEY_REUSED`: this `Idempotency-Key` was already used for another
+            request. Use a new key.
           content:
             application/json:
               schema:
@@ -717,10 +1029,10 @@ paths:
                   summary: SLOT_UNAVAILABLE
                   value:
                     code: SLOT_UNAVAILABLE
-                    message: No table is available for 2 guests on 2026-05-12 at 20:00. Read the availabilities and choose another time slot.
+                    message: No table is available for 2 guests on 2026-05-12T18:00:00Z. Read the availabilities and choose another time slot.
                     details: []
                     request_id: req_8f2c1e0b7a4d4c3e9b1f2a6d5c7e8f90
-                    timestamp: '2026-05-01T10:00:00+00:00'
+                    timestamp: '2026-05-01T10:00:00Z'
                 invalidStatusTransition:
                   summary: INVALID_STATUS_TRANSITION
                   value:
@@ -728,23 +1040,27 @@ paths:
                     message: 'This reservation cannot be cancelled. Current status: confirmed, arrived.'
                     details: []
                     request_id: req_2b7d9e4f1a6c4e8b9d0f3a5c7e1b2d4f
-                    timestamp: '2026-05-12T21:00:00+00:00'
+                    timestamp: '2026-05-12T21:00:00Z'
                 cancellationDeadlinePassed:
                   summary: CANCELLATION_DEADLINE_PASSED
                   value:
                     code: CANCELLATION_DEADLINE_PASSED
-                    message: The cancellation deadline passed on 2026-05-12 at 18:00. Contact the restaurant to cancel this reservation.
+                    message: The cancellation deadline passed on 2026-05-12T16:00:00Z. Contact the restaurant to cancel this reservation.
                     details: []
                     request_id: req_5e1a3c7f9b2d4f6a8c0e2b4d6f8a1c3e
-                    timestamp: '2026-05-12T17:30:00+00:00'
+                    timestamp: '2026-05-12T17:30:00Z'
         '401':
           $ref: '#/components/responses/AuthenticationFailed'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyKeyInProgress'
         '429':
           $ref: '#/components/responses/RateLimited'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
 
   # ---------------------------------------------------------------------------
   # Partner Profile
@@ -766,13 +1082,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PartnerProfile'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
     patch:
       operationId: profile_partial_update
       summary: Update the partner profile
       description: >
         Partially updates the authenticated partner's profile. Only the fields
-        present in the request body will be modified.
+        present in the request body will be modified. `name` cannot change: contact
+        Barestho to rename your account. Needs a read and write API key, otherwise
+        `403 API_KEY_READ_ONLY`.
       tags:
         - Profile
       requestBody:
@@ -791,6 +1113,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PartnerProfile'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
 
   # ---------------------------------------------------------------------------
   # Webhooks
@@ -800,19 +1132,32 @@ paths:
       operationId: webhooks_list
       summary: List webhooks
       description: >
-        Returns all webhooks registered under the authenticated partner account.
-        Each webhook defines a target URL and the set of events it subscribes to.
+        Returns the webhooks registered under the authenticated partner account,
+        paginated with `limit` and `offset`. Each webhook defines a target URL and the
+        set of events it subscribes to. The auth token is never listed.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
       tags:
         - Webhooks
       responses:
         '200':
-          description: A list of webhook configurations for the partner.
+          description: A paginated list of webhook configurations for the partner.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/PartnerWebhook'
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PartnerWebhook'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
     post:
       operationId: webhooks_create
@@ -848,6 +1193,7 @@ paths:
             A `url` that is not HTTPS or does not resolve to public IP addresses has the
             detail code `INVALID_WEBHOOK_URL`.
             `DUPLICATE_WEBHOOK_URL`: another webhook of the partner already uses this `url`.
+            `WEBHOOK_LIMIT_REACHED`: the partner already has 10 webhooks, the maximum.
           content:
             application/json:
               schema:
@@ -857,9 +1203,15 @@ paths:
                 message: Another of your webhooks already uses this URL. Update that webhook or choose another URL.
                 details: []
                 request_id: req_8f2c1e0b7a4d4c3e9b1f2a6d5c7e8f90
-                timestamp: '2026-05-01T10:00:00+00:00'
+                timestamp: '2026-05-01T10:00:00Z'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
 
   /api/v1/partnership/webhooks/{webhook_uuid}/:
     get:
@@ -880,6 +1232,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PartnerWebhook'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
     put:
       operationId: webhooks_update
@@ -909,7 +1267,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/PartnerWebhook'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: >
+            `VALIDATION_ERROR`: a field is missing or malformed. See `details`.
+            `DUPLICATE_WEBHOOK_URL`: another webhook of the partner already uses this `url`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
 
     patch:
       operationId: webhooks_partial_update
@@ -917,7 +1291,7 @@ paths:
       description: >
         Partially updates a webhook configuration. Only the fields included in the
         request body are modified. Useful for toggling `is_enabled` or updating
-        the `subscribed_events` map without resending the full object.
+        the `subscribed_events` list without resending the full object.
       parameters:
         - $ref: '#/components/parameters/WebhookUuid'
       tags:
@@ -937,7 +1311,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/PartnerWebhook'
         '400':
-          $ref: '#/components/responses/ValidationError'
+          description: >
+            `VALIDATION_ERROR`: a field is missing or malformed. See `details`.
+            `DUPLICATE_WEBHOOK_URL`: another webhook of the partner already uses this `url`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
 
     delete:
       operationId: webhooks_destroy
@@ -953,34 +1343,24 @@ paths:
       responses:
         '204':
           description: The webhook was deleted successfully. No response body is returned.
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /api/v1/partnership/webhooks/{webhook_uuid}/auth-token/:
-    get:
-      operationId: webhooks_auth_token_retrieve
-      summary: Retrieve a webhook auth token
-      description: >
-        Returns the current authentication token associated with the specified webhook.
-        This token is included in outgoing webhook request headers so your server can
-        verify that a delivery originated from Barestho. Keep this value secret.
-      parameters:
-        - $ref: '#/components/parameters/WebhookUuid'
-      tags:
-        - Webhooks
-      responses:
-        '200':
-          description: The current auth token of the webhook.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PartnerWebhookAuthToken'
-
     post:
       operationId: webhooks_auth_token_create
       summary: Regenerate a webhook auth token
       description: >
         Issues a new authentication token for the specified webhook and invalidates
-        the previous one. Use this endpoint if you suspect the current token has been
-        compromised. After regeneration, update your server's verification logic with
+        the previous one. The token is shown only in this answer and in the creation
+        answer: it cannot be read again, store it right away. Use this endpoint if you
+        lost the token or suspect it has been compromised. After regeneration, update your server's verification logic with
         the new token before the next delivery attempt.
       parameters:
         - $ref: '#/components/parameters/WebhookUuid'
@@ -1015,16 +1395,30 @@ paths:
                     code: INVALID_CHOICE
                     message: 'Missing action. Use one of: generate.'
                 request_id: req_6f1c2a9e3b7d4e8f9a0b1c2d3e4f5a6b
-                timestamp: '2026-05-01T10:00:00+00:00'
+                timestamp: '2026-05-01T10:00:00Z'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /api/v1/partnership/webhooks/{webhook_uuid}/test/:
     post:
       operationId: webhooks_test_create
       summary: Test a webhook
       description: >
-        Sends a test payload to the webhook's registered URL. Use this after
+        Sends a test event to the webhook's registered URL. Use this after
         creating or updating a webhook to confirm that your endpoint is reachable,
         correctly parses the payload, and returns a `2xx` HTTP response.
+
+
+        `event_name` is required: one of the reservation events. A missing or unknown event
+        name returns `400 VALIDATION_ERROR`. `payload` is optional: without it, Barestho
+        sends `{"occurred_at": ...}`. To test the handling of a given event, send your own
+        `payload`. A test is sent even if the webhook is not subscribed to the event.
 
         The test delivery is recorded in `last_use_at` and `last_response_status_code`,
         just like a real event delivery. The answer holds the status code returned by
@@ -1032,12 +1426,14 @@ paths:
         `url` must still resolve to public IP addresses, otherwise `400 VALIDATION_ERROR`.
 
         A test is sent once: it is never retried nor listed in `/requests/`, and it has
-        no `X-Webhook-Request-Id` header.
+        no `X-Webhook-Request-Id` header. Its signed body has `"test": true`, real events
+        have `"test": false`.
       parameters:
         - $ref: '#/components/parameters/WebhookUuid'
       tags:
         - Webhooks
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -1051,6 +1447,16 @@ paths:
                 $ref: '#/components/schemas/PartnerWebhookTestResult'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
 
   /api/v1/partnership/webhooks/{webhook_uuid}/requests/:
     get:
@@ -1093,6 +1499,10 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '404':
           $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /api/v1/partnership/webhooks/{webhook_uuid}/requests/{request_uuid}/:
     get:
@@ -1114,6 +1524,10 @@ paths:
                 $ref: '#/components/schemas/PartnerWebhookRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
     patch:
       operationId: webhooks_requests_retry
@@ -1122,8 +1536,9 @@ paths:
         Sends the request again right away, with the same `X-Webhook-Request-Id`.
         The call waits for your server, up to 10 seconds.
 
-        On a `PENDING` request, the attempt counts like an automatic one. On a `FAILED`
-        request, `attempts` does not change and no automatic attempt follows.
+        A manual retry is never counted: `attempts` does not change. A `PENDING`
+        request keeps its automatic attempts, the next one computed from this retry.
+        A `FAILED` request gets no automatic attempt.
 
         Needs a read and write API key.
       parameters:
@@ -1164,7 +1579,7 @@ paths:
                     code: INVALID_CHOICE
                     message: 'Missing action. Use one of: retry.'
                 request_id: req_6f1c2a9e3b7d4e8f9a0b1c2d3e4f5a6b
-                timestamp: '2026-05-01T10:00:00+00:00'
+                timestamp: '2026-05-01T10:00:00Z'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -1182,7 +1597,11 @@ paths:
                 message: The webhook or its partner is disabled. Enable it before retrying the request.
                 details: []
                 request_id: req_8f2c1e0b7a4d4c3e9b1f2a6d5c7e8f90
-                timestamp: '2026-05-01T10:00:00+00:00'
+                timestamp: '2026-05-01T10:00:00Z'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
 # =============================================================================
 # Component Schemas
@@ -1220,6 +1639,18 @@ components:
         auth-token endpoints for a comparable token rotation pattern).
 
   parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: >
+        Unique value chosen by you, such as a UUID, to retry the request safely.
+        Scoped to your partner account, kept 24 hours after a success.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+      example: 5f0c7b1e-8a43-4d6e-9f0a-2b7c1d9e4a10
     RestaurantPk:
       name: restaurant_pk
       in: path
@@ -1263,7 +1694,28 @@ components:
         type: string
         format: uuid
 
+  headers:
+    IdempotentReplayed:
+      description: "`true` when the response is the replay of a previous request with the same `Idempotency-Key`."
+      schema:
+        type: string
+        enum:
+          - 'true'
   responses:
+    IdempotencyKeyInProgress:
+      description: >
+        `IDEMPOTENCY_KEY_IN_PROGRESS`: a request with this `Idempotency-Key` is still
+        running. Wait a few seconds, then retry.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: IDEMPOTENCY_KEY_IN_PROGRESS
+            message: A request with this Idempotency-Key is still running. Retry later.
+            details: []
+            request_id: req_8f2c1e0b7a4d4c3e9b1f2a6d5c7e8f90
+            timestamp: '2026-05-01T10:00:00Z'
     ValidationError:
       description: "`VALIDATION_ERROR`: a field is missing or malformed. See `details`."
       content:
@@ -1275,13 +1727,14 @@ components:
             message: Invalid request.
             details:
             - field: adults
-              code: MAX_VALUE
-              message: Ensure this value is less than or equal to 50.
+              code: MIN_VALUE
+              message: Ensure this value is greater than or equal to 1.
             request_id: req_8f2c1e0b7a4d4c3e9b1f2a6d5c7e8f90
-            timestamp: '2026-05-01T10:00:00+00:00'
+            timestamp: '2026-05-01T10:00:00Z'
     AuthenticationFailed:
       description: >
-        `AUTHENTICATION_FAILED`: invalid credentials.
+        `AUTHENTICATION_FAILED`: invalid credentials, or expired token (message
+        `Expired token, please use another one.`).
         `PARTNER_DISABLED`: the partner account is disabled.
       content:
         application/json:
@@ -1292,7 +1745,7 @@ components:
             message: Invalid credentials.
             details: []
             request_id: req_8f2c1e0b7a4d4c3e9b1f2a6d5c7e8f90
-            timestamp: '2026-05-01T10:00:00+00:00'
+            timestamp: '2026-05-01T10:00:00Z'
     Forbidden:
       description: >
         `RESTAURANT_ACCESS_DENIED`: the restaurant has not granted access.
@@ -1312,10 +1765,10 @@ components:
               code: SCOPE_MISSING
               scope: reservations:manage
             request_id: req_8f2c1e0b7a4d4c3e9b1f2a6d5c7e8f90
-            timestamp: '2026-05-01T10:00:00+00:00'
+            timestamp: '2026-05-01T10:00:00Z'
     NotFound:
       description: >
-        `NOT_FOUND`: unknown resource, or restaurant inactive or not linked to the partner.
+        `NOT_FOUND`: unknown resource, or restaurant not linked to the partner.
       content:
         application/json:
           schema:
@@ -1325,12 +1778,38 @@ components:
             message: Not found.
             details: []
             request_id: req_8f2c1e0b7a4d4c3e9b1f2a6d5c7e8f90
-            timestamp: '2026-05-01T10:00:00+00:00'
+            timestamp: '2026-05-01T10:00:00Z'
+    PayloadTooLarge:
+      description: "`PAYLOAD_TOO_LARGE`: the request body is over 64 KB."
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: PAYLOAD_TOO_LARGE
+            message: The request body must not exceed 64 KB.
+            details: []
+            request_id: req_8f2c1e0b7a4d4c3e9b1f2a6d5c7e8f90
+            timestamp: '2026-05-01T10:00:00Z'
     RateLimited:
-      description: "`RATE_LIMITED`: too many requests. Wait for `Retry-After` seconds."
+      description: >
+        `RATE_LIMITED`: too many requests, or 20 failed authentications in 15 minutes from
+        your IP address (then without `X-RateLimit-*` headers). Wait for `Retry-After` seconds.
       headers:
         Retry-After:
           description: Seconds to wait before the next request.
+          schema:
+            type: integer
+        X-RateLimit-Limit:
+          description: Requests allowed per window. Sent on every answer.
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          description: Requests left in the current window. Sent on every answer.
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          description: Unix time when the oldest counted request leaves the window. Sent on every answer.
           schema:
             type: integer
       content:
@@ -1342,7 +1821,7 @@ components:
             message: Request was throttled. Expected available in 12 seconds.
             details: []
             request_id: req_8f2c1e0b7a4d4c3e9b1f2a6d5c7e8f90
-            timestamp: '2026-05-01T10:00:00+00:00'
+            timestamp: '2026-05-01T10:00:00Z'
 
   schemas:
     # -------------------------------------------------------------------------
@@ -1368,14 +1847,18 @@ components:
             - NOT_FOUND
             - METHOD_NOT_ALLOWED
             - NOT_ACCEPTABLE
+            - PAYLOAD_TOO_LARGE
             - UNSUPPORTED_MEDIA_TYPE
             - SLOT_UNAVAILABLE
             - DUPLICATE_WEBHOOK_URL
+            - WEBHOOK_LIMIT_REACHED
             - WEBHOOK_DISABLED
             - PAYMENT_REQUIRED
             - INVALID_STATUS_TRANSITION
             - CANCELLATION_DEADLINE_PASSED
             - RATE_LIMITED
+            - IDEMPOTENCY_KEY_REUSED
+            - IDEMPOTENCY_KEY_IN_PROGRESS
             - INTERNAL_ERROR
         message:
           type: string
@@ -1566,7 +2049,8 @@ components:
           description: Unique partner UUID used for authentication.
         name:
           type: string
-          description: Partner's display name. This value is shown to restaurants.
+          readOnly: true
+          description: Partner's display name. This value is shown to restaurants. Set by Barestho only.
         description:
           type: object
           properties:
@@ -1754,23 +2238,32 @@ components:
             The response of the target URL to the most recent delivery attempt:
             `headers`, `body` (raw text) and `reason`. `null` if no delivery has been made yet.
         subscribed_events:
-          type: object
-          additionalProperties: {}
+          type: array
           nullable: true
+          items:
+            type: string
+            enum:
+              - RESERVATION_CREATED
+              - RESERVATION_CONFIRMED
+              - RESERVATION_MODIFIED
+              - RESERVATION_CANCELLED
+              - RESERVATION_ARRIVED
+              - RESERVATION_NO_SHOW
+              - RESERVATION_MARKERS_RESET
           description: >
-            A JSON object mapping event type keys to boolean values, specifying which
-            platform events should trigger a delivery to this webhook. Consult the
-            event catalogue in your partner documentation for available event type keys.
+            Events sent to this webhook. `null` (the default): every event, including
+            the events added later. An empty list: no event. Tests sent with `/test/`
+            are always delivered.
       required:
         - url
       example:
         uuid: 7c9e6679-7425-40de-944b-e07fc1f90ae7
-        created_at: '2026-05-01T10:00:00+02:00'
-        updated_at: '2026-05-01T10:00:00+02:00'
+        created_at: '2026-05-01T08:00:00Z'
+        updated_at: '2026-05-01T08:00:00Z'
         url: https://api.example.com/barestho/webhooks
         name: Production
         is_enabled: true
-        last_use_at: '2026-05-12T15:41:00+02:00'
+        last_use_at: '2026-05-12T13:41:00Z'
         last_response_status_code: 200
         last_response:
           headers:
@@ -1843,12 +2336,21 @@ components:
           nullable: true
           description: Response of the target URL to the most recent delivery (`headers`, `body`, `reason`). Managed by the server.
         subscribed_events:
-          type: object
-          additionalProperties: {}
+          type: array
           nullable: true
+          items:
+            type: string
+            enum:
+              - RESERVATION_CREATED
+              - RESERVATION_CONFIRMED
+              - RESERVATION_MODIFIED
+              - RESERVATION_CANCELLED
+              - RESERVATION_ARRIVED
+              - RESERVATION_NO_SHOW
+              - RESERVATION_MARKERS_RESET
           description: >
-            Updated event subscription map. Replaces the existing subscription configuration
-            entirely when provided.
+            Events sent to this webhook. Replaces the whole list. `null`: every event,
+            including the events added later. An empty list: no event.
 
     # -------------------------------------------------------------------------
     # PartnerRestaurantReservation
@@ -1865,7 +2367,7 @@ components:
         id:
           type: integer
           readOnly: true
-          description: Unique numeric identifier for the reservation, assigned by the server.
+          description: Numeric identifier of the reservation, assigned by the server. Unique within its restaurant only.
         first_name:
           type: string
           nullable: true
@@ -1902,17 +2404,16 @@ components:
             Calculated and set by the server based on the restaurant's slot configuration.
         adults:
           type: integer
-          maximum: 50
           minimum: 1
+          maximum: 999
           description: >
-            Number of adult guests in the party. Must be between 1 and 50 (inclusive).
-            **Required.**
+            Number of adult guests in the party, from 1 to 999. **Required.**
         children:
           type: integer
-          maximum: 50
+          minimum: 0
+          maximum: 999
           description: >
-            Number of child guests in the party. Defaults to 0 if omitted.
-            Must be between 0 and 50 (inclusive).
+            Number of child guests in the party, from 0 to 999. Defaults to 0 if omitted.
         comment:
           type: string
           nullable: true
@@ -2026,7 +2527,8 @@ components:
           description: >
             Arbitrary key-value pairs that the partner can attach to a reservation
             for their own tracking purposes (e.g. internal booking reference, campaign ID).
-            The platform stores this data as-is and does not interpret it.
+            The platform stores this data as-is and does not interpret it. At most 4 KB
+            as compact JSON.
             **Never put sensitive data here:** every partner that reads the reservation sees it.
         last_cancellable_at:
           type: string
@@ -2081,7 +2583,7 @@ components:
         last_name: Weissnat
         email: k.weissnat@example.com
         phone: '+32470123456'
-        start_time: '2026-05-12T20:00:00+02:00'
+        start_time: '2026-05-12T18:00:00Z'
         duration: 02:00:00
         adults: 2
         children: 0
@@ -2098,20 +2600,20 @@ components:
         cancelled: false
         cancelled_at: null
         confirmed: true
-        confirmed_at: '2026-05-01T10:00:00+02:00'
+        confirmed_at: '2026-05-01T08:00:00Z'
         confirmation_mode: CONFIRMATION_MODE_SYNCHRONOUS
         arrived: false
         arrived_at: null
         no_show: false
         no_show_at: null
-        last_cancellable_at: '2026-05-11T20:00:00+02:00'
+        last_cancellable_at: '2026-05-11T18:00:00Z'
         language: fr
         metadata:
           booking_ref: BK-1042
         initiator_partner_name: Acme Booking
         source: BARESTHO_PARTNER
-        created_at: '2026-05-01T10:00:00+02:00'
-        updated_at: '2026-05-01T10:00:00+02:00'
+        created_at: '2026-05-01T08:00:00Z'
+        updated_at: '2026-05-01T08:00:00Z'
 
     # -------------------------------------------------------------------------
     # PartnerReservationSpecialOption
@@ -2156,19 +2658,19 @@ components:
         adults:
           type: integer
           minimum: 1
-          maximum: 50
-          description: New number of adults.
+          maximum: 999
+          description: New number of adults, from 1 to 999.
         children:
           type: integer
           minimum: 0
-          maximum: 50
-          description: New number of children.
+          maximum: 999
+          description: New number of children, from 0 to 999.
         metadata:
           type: object
           additionalProperties: {}
           nullable: true
           description: >
-            Your own key-value pairs. Replaces the stored value.
+            Your own key-value pairs. Replaces the stored value. At most 4 KB as compact JSON.
             **Never put sensitive data here:** every partner that reads the reservation sees it.
       example:
         start_time: '2026-05-12T20:30:00+02:00'
@@ -2179,7 +2681,10 @@ components:
     # -------------------------------------------------------------------------
     PartnerRestaurantAvailabilities:
       type: object
-      description: Availabilities by date (`YYYY-MM-DD`).
+      description: >
+        Availabilities by UTC date (`YYYY-MM-DD`): each time is grouped under the UTC
+        date of its `timestamp`. Convert with the restaurant `timezone` to display local
+        times and days.
       additionalProperties:
         $ref: '#/components/schemas/PartnerRestaurantAvailabilityDay'
       example:
@@ -2192,7 +2697,6 @@ components:
             limit_margin: null
             has_some_availability_left: true
             last_bookable_sec: 1778608800
-            from_hour: '19:00:00'
             timestamp: 1778605200
             availability:
               '1':
@@ -2233,15 +2737,17 @@ components:
         last_bookable_sec:
           type: integer
           description: Unix timestamp after which this time cannot be booked anymore.
-        from_hour:
-          type: string
-          description: Local time, `HH:MM:SS`.
         timestamp:
           type: integer
-          description: Unix timestamp of this time.
+          description: >
+            Unix timestamp of this time. Convert it with the restaurant `timezone` to
+            display the local time.
         availability:
           type: object
-          description: Zone id → party size → number of free tables.
+          description: >
+            Zone id → party size → number of free tables. Zone `0` sums every zone when the
+            restaurant has fewer than two public zones. Party sizes that need a prepayment
+            are not listed.
           additionalProperties:
             type: object
             additionalProperties:
@@ -2254,6 +2760,42 @@ components:
           type: boolean
         show_call_option_on_limit_reached:
           type: boolean
+
+    PartnerRestaurantAvailabilitySlots:
+      type: object
+      properties:
+        party_size:
+          type: integer
+          description: The requested number of guests.
+        slots:
+          type: array
+          description: Bookable slots, sorted by `start_time`.
+          items:
+            $ref: '#/components/schemas/PartnerRestaurantBookableSlot'
+      example:
+        party_size: 2
+        slots:
+          - start_time: '2026-05-12T18:00:00Z'
+            last_bookable_at: '2026-05-12T16:00:00Z'
+            zone_ids: [1, 3]
+    PartnerRestaurantBookableSlot:
+      type: object
+      properties:
+        start_time:
+          type: string
+          format: date-time
+          description: Start of the slot, in UTC. Send it as `start_time` to create the reservation.
+        last_bookable_at:
+          type: string
+          format: date-time
+          description: After this moment, the slot cannot be booked anymore.
+        zone_ids:
+          type: array
+          description: >
+            Public zones with a free table for the party, usable as `zone_id`. Empty: create
+            the reservation without `zone_id`.
+          items:
+            type: integer
 
     # -------------------------------------------------------------------------
     # PartnerWebhookWithToken
@@ -2270,8 +2812,8 @@ components:
               description: Secret used to sign the deliveries. Generated by Barestho.
       example:
         uuid: 7c9e6679-7425-40de-944b-e07fc1f90ae7
-        created_at: '2026-05-01T10:00:00+02:00'
-        updated_at: '2026-05-01T10:00:00+02:00'
+        created_at: '2026-05-01T08:00:00Z'
+        updated_at: '2026-05-01T08:00:00Z'
         url: https://api.example.com/barestho/webhooks
         name: Production
         is_enabled: true
@@ -2290,21 +2832,33 @@ components:
         auth_token: wh_sec_3q9ZkVt0b2XyR7mN1pL8sD4fG6hJ5cA0eW2uI9oTb7Xk2LpQ
     PartnerWebhookTestRequest:
       type: object
+      description: A test event. `payload` is optional.
+      required:
+        - event_name
       properties:
         event_name:
           type: string
-          description: Event name sent to your server.
+          description: A reservation event, sent as `event`.
+          enum:
+            - RESERVATION_CREATED
+            - RESERVATION_CONFIRMED
+            - RESERVATION_MODIFIED
+            - RESERVATION_CANCELLED
+            - RESERVATION_ARRIVED
+            - RESERVATION_NO_SHOW
+            - RESERVATION_MARKERS_RESET
         payload:
           type: object
           additionalProperties: {}
-          description: Any JSON object, sent as `payload`.
-      required:
-        - event_name
-        - payload
+          description: >
+            Any JSON object, sent as `payload`. Default: `{"occurred_at": ...}`, the
+            sending time in UTC.
       example:
-        event_name: TEST
+        event_name: RESERVATION_CANCELLED
         payload:
-          message: Hello from Barestho
+          restaurant: le-bistrot
+          reservation:
+            id: 25
     PartnerWebhookTestResult:
       type: object
       properties:
@@ -2346,7 +2900,7 @@ components:
           $ref: '#/components/schemas/PartnerWebhookRequestStatus'
         attempts:
           type: integer
-          description: Number of attempts counted, out of 8. A manual retry of a `FAILED` request is not counted.
+          description: Number of automatic attempts, out of 8. A manual retry is not counted.
         next_attempt_at:
           type: string
           format: date-time
@@ -2366,7 +2920,7 @@ components:
           nullable: true
           description: >
             Response of your server to the last attempt: `headers`, `body` (first 10,000
-            characters) and `reason`. Or `error` when your server did not answer
+            bytes) and `reason`. Or `error` when your server did not answer
             (connection error, timeout).
         created_at:
           type: string
@@ -2377,24 +2931,30 @@ components:
         event_name: RESERVATION_CONFIRMED
         payload:
           restaurant: le-bistrot
+          occurred_at: '2026-05-12T13:39:58Z'
           reservation:
             id: 25
             first_name: Jane
             last_name: Doe
-            start_time: '2026-05-12T20:00:00+02:00'
-            duration: '2:00:00'
+            start_time: '2026-05-12T18:00:00Z'
+            duration: '02:00:00'
             adults: 4
             children: 0
+            confirmed: true
+            cancelled: false
+            arrived: false
+            no_show: false
             metadata:
               booking_ref: BK-1042
+            updated_at: '2026-05-12T13:39:58Z'
         status: PENDING
         attempts: 2
-        next_attempt_at: '2026-05-12T15:46:00+02:00'
-        last_attempt_at: '2026-05-12T15:41:00+02:00'
+        next_attempt_at: '2026-05-12T13:46:00Z'
+        last_attempt_at: '2026-05-12T13:41:00Z'
         last_response_status_code: 503
         last_response:
           headers:
             Content-Type: text/plain
           body: Service Unavailable
           reason: Service Unavailable
-        created_at: '2026-05-12T15:40:00+02:00'
+        created_at: '2026-05-12T13:40:00Z'

@@ -11,11 +11,11 @@ Before a restaurant appears in your list, its manager must first **explicitly au
 If you are a Barestho client managing your own restaurants, the link set up by the Barestho team is your agreement: no extra authorization is needed.
 </Aside>
 
-Only **active** restaurants are visible. For a restaurant you cannot use:
+For a restaurant you cannot use:
 
 | Case | Response |
 |---|---|
-| Not linked to you, inactive, or unknown | `404` with the code `NOT_FOUND` |
+| Not linked to you, or unknown | `404` with the code `NOT_FOUND` |
 | Linked to you, but access not granted | `403` with the code `RESTAURANT_ACCESS_DENIED` |
 
 ## List Accessible Restaurants
@@ -27,6 +27,8 @@ GET /api/v1/partnership/restaurants/?limit=10&offset=0 HTTP/1.1
 Host: public.api.barestho.com
 Authorization: Basic <base64(uuid:token)>
 ```
+
+Search with `?search=` on the internal `name` and `schema_name` of the restaurant (case-insensitive). `display_name` cannot be searched.
 
 **Response `200 OK`:**
 ```json
@@ -65,11 +67,11 @@ Each restaurant grants you a set of **scopes**, listed in `access.scopes`. Each 
 
 | Scope | Gives access to |
 |---|---|
-| `availabilities:read` | Availabilities, zones |
+| `availabilities:read` | Availabilities, bookable slots, zones |
 | `reservations:write_own` | Create, read, update and cancel **your** reservations |
 | `reservations:read_all` | Read **every** reservation of the restaurant, from all channels |
 | `reservations:manage` | Update any reservation and change its status |
-| `tables:read` | Tables |
+| `tables:read` | Tables, [best tables](/partnership-documentation/guides/06-read-availabilities#find-the-best-tables) of a time slot |
 
 By default, you get `availabilities:read` and `reservations:write_own`. A restaurant may grant you more, for example `reservations:manage` for a POS. Scopes are set per restaurant: always read `access.scopes` of the restaurant you work with.
 
@@ -79,7 +81,7 @@ More scopes exist for future features. Ignore the values you do not know.
 
 ## Restaurant Modules
 
-A scope is not enough when the restaurant has disabled the related module. The API then answers `403` with the code `MODULE_DISABLED`, and `details` names the module. Today, the `RESERVATIONS` module gates availabilities and reservation creation.
+A scope is not enough when the restaurant has disabled the related module. The API then answers `403` with the code `MODULE_DISABLED`, and `details` names the module. Today, the `RESERVATIONS` module gates the availabilities (detailed, bookable slots and best tables) and the reservation creation.
 
 ## Zones and Tables
 
@@ -88,4 +90,4 @@ A scope is not enough when the restaurant has disabled the related module. The A
 | `GET /api/v1/partnership/restaurants/:restaurant_id/zones/` | `availabilities:read` | Zones: `id`, `name`, `description`, `is_public`, `priority` |
 | `GET /api/v1/partnership/restaurants/:restaurant_id/tables/` | `tables:read` | Tables: `id`, `name`, `zone_id`, `zone_name`, `seats`, `min_seats`, `type`, `priority` |
 
-Both lists are paginated with `limit` and `offset`. They hold inactive items too: add `active=true` to skip them. Zones filter on `name`; tables filter on `name`, `zone`, `zone_name` and `seats`. Zone ids are the keys of the `availability` object (see [Read Availabilities](/partnership-documentation/guides/06-read-availabilities)).
+Both lists are paginated with `limit` and `offset`. They hold inactive items too: add `active=true` to skip them. Zones filter on `name`; tables filter on `name`, `zone`, `zone_name` and `seats`. Sort with `?ordering=`: zones on `priority` or `id`; tables on `priority`, `id`, `name`, `seats`, `min_seats`, `type`, `zone` or `zone_name`. Add `-` for descending, e.g. `?ordering=-seats`. Search with `?search=`: zones on their internal and public names; tables on their name and the names of their zone. Zone ids are the keys of the `availability` object, and the values of `zone_ids` in the bookable slots (see [Read Availabilities](/partnership-documentation/guides/06-read-availabilities)). With fewer than two public zones, the availabilities do not detail the zones: they sum them under the key `"0"`, and `zone_ids` is empty.

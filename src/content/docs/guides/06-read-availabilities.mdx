@@ -7,14 +7,50 @@ Understanding how Barestho structures its availability is essential for displayi
 
 Reading availabilities needs the `availabilities:read` scope and the restaurant `RESERVATIONS` module. Otherwise, the API answers `403` with the code `SCOPE_MISSING` or `MODULE_DISABLED`.
 
-## Data Structure
+```
+GET /api/v1/partnership/restaurants/:id/availabilities/?from_datetime=2026-05-01T00:00:00Z&to_datetime=2026-05-31T23:59:59Z
+```
+
+One request covers at most **31 days** between `from_datetime` and `to_datetime`. A longer range returns `400 VALIDATION_ERROR`: split it into several requests.
+
+## Bookable Slots
+
+To know when a party can book, ask for the bookable slots. Barestho applies every rule for you:
+
+```
+GET /api/v1/partnership/restaurants/:id/availabilities/slots/?from_datetime=2026-05-01T00:00:00Z&to_datetime=2026-05-31T23:59:59Z&party_size=4
+```
+
+```json
+{
+    "party_size": 4,
+    "slots": [
+        { "start_time": "2026-05-12T18:00:00Z", "last_bookable_at": "2026-05-12T16:00:00Z", "zone_ids": [1, 3] }
+    ]
+}
+```
+
+- A slot is listed when it can be booked now: shift active, no booking limit reached, `last_bookable_at` not passed, and a table free for the party **without prepayment**.
+- The slots are sorted by `start_time`, in UTC. Send `start_time` as is to create the reservation.
+- `zone_ids` lists the public zones with a free table, usable as `zone_id`. When it is empty, create the reservation without `zone_id`: Barestho chooses the tables.
+- `party_size` is from 1 to 999. Same scope and module as below.
+
+The rest of this guide describes the detailed format, for a calendar or a view per zone.
+
+## Detailed Availabilities
+
+<Aside type="caution">
+Everything is in **UTC**. The days are UTC dates, and each time is a Unix `timestamp`. To display local days and times, convert with the restaurant `timezone` (see the restaurant object). A late evening service can be listed under the next UTC day.
+</Aside>
+
+### Data Structure
 
 The availability flow follows a top-down hierarchy: 
 **Date** → **Shifts** (Services) → **Zones** → **Capacity per party size**.
 
 ---
 
-## Understanding the `availability` Object
+### Understanding the `availability` Object
 
 The `availability` object represents the distribution of free seats within the different zones of the restaurant (e.g., Main Dining Room, Terrace, Upstairs).
 
@@ -31,13 +67,14 @@ The `availability` object represents the distribution of free seats within the d
 ```
 
 ### Key Points to Remember
-* **First-level keys (`"1"`, `"2"`)**: Correspond to the unique identifiers of the restaurant's zones. Get their names with `GET /api/v1/partnership/restaurants/:restaurant_id/zones/`.
-* **Second-level keys (`"2"`, `"4"`)**: Represent the number of people (party size).
+* **First-level keys (`"1"`, `"2"`)**: Correspond to the unique identifiers of the restaurant's zones. Get their names with `GET /api/v1/partnership/restaurants/:restaurant_id/zones/`. Every zone is listed, public or not: to book a given zone with `zone_id`, choose a zone whose `is_public` is `true`. A zone that is not public is refused as `zone_id` (`400 VALIDATION_ERROR`).
+* **Key `"0"`**: when the restaurant has fewer than two public zones, the zones are not detailed: `"0"` sums the free tables of every zone. Create the reservation without `zone_id`.
+* **Second-level keys (`"2"`, `"4"`)**: Represent the number of people (party size). A party size that needs a prepayment is not listed: the API cannot take payments.
 * **Values (`6`, `4`)**: Represent the number of tables/slots remaining for that specific configuration.
 
 ---
 
-## Availability Indicators
+### Availability Indicators
 
 To build an accurate user interface, rely on these indicators:
 
@@ -47,16 +84,20 @@ To build an accurate user interface, rely on these indicators:
 
 ---
 
-## Recommended Display Logic
+### Recommended Display Logic
 
 For a smooth integration, we suggest the following logic:
 
-1.  **Slot Selection**: Iterate through the `shifts` and retrieve objects via their `from_hour` (e.g., "19:00:00").
+1.  **Slot Selection**: Iterate through the `shifts` and convert each `timestamp` to the restaurant `timezone` (e.g., `1778605200` is 19:00 in `Europe/Brussels`).
 2.  **Filter by Party Size**: 
-    * If your user is looking for a table for **4 people**, check if the key `"4"` exists in any of the zones within the `availability` object.
+    * If your user is looking for a table for **4 people**, check that the value of the key `"4"` is **greater than 0** in at least one zone of the `availability` object. A key can be present with `0`: no table left for that party size.
     * Sum the values if you want to display total availability, or segment by zone if you allow the user to choose their seating location.
 3.  **Time Validation**: Verify that the current time is before `last_bookable_sec`.
 4.  **Display**: Show the reservation button only if at least one zone can accommodate the requested party size.
+
+<Aside type="caution">
+**Breaking changes:** with fewer than two public zones, the zones are summed under `"0"` instead of being listed by id. The party sizes that need a prepayment are no longer listed (they were refused at the creation with `PAYMENT_REQUIRED`).
+</Aside>
 
 <Aside type="note">
 If a zone does not appear in the object for a given slot, it means it is either fully booked or closed for that specific service.
@@ -65,3 +106,23 @@ If a zone does not appear in the object for a given slot, it means it is either 
 <Aside type="tip">
 **Optimization:** You do not need to manage "table joining" logic. The Barestho Partnership API already calculates if a table of 4 can be formed and provides the final result directly in the dictionary.
 </Aside>
+
+---
+
+## Find the Best Tables
+
+To know which tables Barestho would give to a reservation, ask for the best tables of a time slot. It needs the `tables:read` scope and the restaurant `RESERVATIONS` module.
+
+```
+GET /api/v1/partnership/restaurants/:id/availabilities/best-tables/?start_time=2026-05-12T20:00:00%2B02:00&guests=4&duration=02:00:00
+```
+
+| Parameter | Required | Content |
+|---|---|---|
+| `start_time` | Yes | Start of the time slot |
+| `guests` | Yes | Number of guests, from 1 to 999 |
+| `duration` | Yes | Duration, e.g. `02:00:00`. More than 0 and at most 12 hours |
+| `zone_id` | No | Keep only the tables of this zone |
+| `greedy` | No | `CLIENT` partners only. `true` ignores the restaurant's services: any time of the day is open, without booking limits nor minimum booking delay |
+
+The answer is a list of tables, with the same fields as the tables list. It is the assignment used when you create a reservation without `tables`. An empty list means that no table is free. The list is not paginated.

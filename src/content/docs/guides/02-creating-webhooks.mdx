@@ -1,8 +1,7 @@
 ---
 title: ✏️ Creating Webhooks
 ---
-import { Aside } from '@astrojs/starlight/components';
-import { Code } from '@astrojs/starlight/components';
+import { Aside, Code, TabItem, Tabs } from '@astrojs/starlight/components';
 
 ## Webhook Management
 
@@ -16,7 +15,19 @@ Refer to the API reference for the full list of available operations (create, re
 
 A webhook is identified by its `uuid`: `/api/v1/partnership/webhooks/:uuid/`.
 
-A webhook `url` must be unique among your webhooks. Otherwise, the creation returns `400` with the code `DUPLICATE_WEBHOOK_URL`.
+A webhook `url` must be unique among your webhooks. Otherwise, the creation or the update returns `400` with the code `DUPLICATE_WEBHOOK_URL`.
+
+Choose the events of a webhook with `subscribed_events`:
+
+| Value | Events sent |
+|---|---|
+| `null` (default) | Every event, including the events added later |
+| `["RESERVATION_CANCELLED"]` | Only the listed events |
+| `[]` | No event: the webhook is paused for events |
+
+Test events (`POST /webhooks/:uuid/test/`) are always sent.
+
+You can have at most **10 webhooks**. The 11th creation returns `400` with the code `WEBHOOK_LIMIT_REACHED`: delete a webhook, or update one to use another URL.
 
 A webhook `url` must:
 
@@ -36,14 +47,27 @@ ngrok http 3000
 
 Register the public `https://` URL given by the tunnel as the webhook `url`. Then send a test event:
 
-```
-POST /api/v1/partnership/webhooks/:uuid/test/
+```http
+POST /api/v1/partnership/webhooks/:uuid/test/ HTTP/1.1
+Content-Type: application/json
+
+{"event_name": "RESERVATION_CANCELLED"}
 ```
 
-The answer holds the status code returned by your server only, e.g. `{"response": {"status_code": 200}}`. A test is never retried.
+- `event_name` is required: one of the [reservation events](/partnership-documentation/guides/05-manage-reservations#webhook-events). A missing or unknown event name returns `400 VALIDATION_ERROR`.
+- `payload` is optional. Without it, Barestho sends `{"occurred_at": "..."}`. To test the handling of an event, send your own payload, e.g. a sample reservation.
+
+The answer holds the status code returned by your server only, e.g. `{"response": {"status_code": 200}}`. A test is never retried, and it is sent even if the webhook is not subscribed to the event.
 
 <Aside type='caution'>
-**Breaking change:** webhooks used to be identified by a numeric `id`. The `id` is no longer exposed: use `uuid` in the URLs. The event body sends `webhook_uuid` instead of `webhook_id`.
+**Breaking changes:**
+
+- Webhooks used to be identified by a numeric `id`. The `id` is no longer exposed: use `uuid` in the URLs. The event body sends `webhook_uuid` instead of `webhook_id`.
+- `GET /webhooks/` is paginated like the other lists: read `results`, then `next`.
+- `GET /webhooks/:uuid/auth-token/` is removed: the token is shown only at the creation and when you generate a new one.
+- The signature covers the raw body (see [Signature Verification](#signature-verification)), and the event body has a `test` field.
+- In the event body, `start_time` is in UTC (`2026-05-12T18:00:00Z`) and `duration` uses `HH:MM:SS` (`02:00:00`), like the REST API.
+- `POST /webhooks/:uuid/test/` accepts reservation events only (no free `event_name` such as `TEST`). `payload` is optional.
 </Aside>
 
 ## Event Requests
@@ -55,12 +79,21 @@ Barestho sends each event as a `POST` request with a JSON body:
     "partner_uuid": "550e8400-e29b-41d4-a716-446655440000",
     "webhook_uuid": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
     "event": "RESERVATION_CONFIRMED",
+    "test": false,
     "payload": {
         "restaurant": "le-bistrot",
-        "reservation": { "id": 25, "first_name": "Jane", "last_name": "Doe", "start_time": "2026-05-12T20:00:00+02:00", "duration": "2:00:00", "adults": 4, "children": 0, "metadata": null }
+        "occurred_at": "2026-05-12T13:39:58Z",
+        "reservation": { "id": 25, "first_name": "Jane", "last_name": "Doe", "start_time": "2026-05-12T18:00:00Z", "duration": "02:00:00", "adults": 4, "children": 0, "confirmed": true, "cancelled": false, "arrived": false, "no_show": false, "metadata": null, "source": "BARESTHO_PARTNER", "initiator_partner_name": "Acme Booking", "updated_at": "2026-05-12T13:39:58Z" }
     }
 }
 ```
+
+- `payload.occurred_at` is the moment of the event. It stays the same on every retry, unlike `X-Webhook-Timestamp` (the sending time).
+- `payload.reservation.updated_at` is the version of the reservation: events may arrive out of order, so ignore an event older than the state you already hold.
+
+`test` is `true` for the events sent by `POST /webhooks/:uuid/test/`, `false` otherwise. It is part of the signed body: ignore test events in production.
+
+`payload.restaurant` is the `schema_name` of the restaurant (see the restaurant object). A reservation `id` is unique within its restaurant only: identify a reservation by `restaurant` **and** `reservation.id`.
 
 See [Webhook Events](/partnership-documentation/guides/05-manage-reservations#webhook-events) for the list of events.
 
@@ -73,8 +106,12 @@ Not implementing it exposes your system to fraudulent requests.
 
 Each request sent to your webhook is signed by Barestho using an  
 [**HMAC-SHA256**](https://en.wikipedia.org/wiki/HMAC) computed from your `auth_token`,  
-the request payload, and the current time as a *timestamp*.  
-The `auth_token` is generated by Barestho and returned once, in the webhook creation response. Read it again with `GET /api/v1/partnership/webhooks/:uuid/auth-token/`, or replace it with `POST /api/v1/partnership/webhooks/:uuid/auth-token/?action=generate`.
+the **exact bytes** of the request body, and the current time as a *timestamp*.  
+The `auth_token` is generated by Barestho and returned once, in the webhook creation response. It cannot be read again: store it right away. If you lose it, replace it with `POST /api/v1/partnership/webhooks/:uuid/auth-token/?action=generate` (read and write API key), which returns the new token once and invalidates the previous one.
+
+<Aside type='tip'>
+**Creation response lost** (network error, timeout): the webhook may exist already. A retry then returns `400 DUPLICATE_WEBHOOK_URL`. Find the webhook with `GET /webhooks/` (same `url`), then generate its token with `auth-token/?action=generate`. The webhook creation does not support `Idempotency-Key`: the token is never stored to be shown again.
+</Aside>
 
 The following headers are included with each request:
 
@@ -89,72 +126,308 @@ The following headers are included with each request:
 To validate that a request originates from Barestho, reconstruct the signature as follows:
 
 1. Retrieve the timestamp from `X-Webhook-Timestamp`
-2. Serialize the request body to JSON without spaces, with keys sorted alphabetically
-3. Build the message to sign: `{timestamp}.{serialized_json}`
+2. Read the **raw body** of the request, as bytes. Do not parse and serialize it again: any change of spaces, key order or character escaping breaks the signature
+3. Build the message to sign: `{timestamp}.{raw_body}`
 4. Compute an HMAC-SHA256 of this message using your `auth_token` as the key
-5. Prefix the result with `sha256=` and compare it to `X-Webhook-Signature`
+5. Prefix the result with `sha256=` and compare it to `X-Webhook-Signature`, in constant time
 
+The body is compact JSON in UTF-8: accents are sent as they are (`"François"`), not escaped.
+
+<Aside type='caution'>
+**Breaking change:** the signature used to cover the body serialized again with sorted keys. It now covers the raw body. Update your verification code.
+</Aside>
+
+<Tabs syncKey="language">
+  <TabItem label="Python">
 <Code 
     code={`
-import hmac
 import hashlib
-import json
+import hmac
 import time
 
 SIGNATURE_PREFIX = "sha256="
 TIMESTAMP_TOLERANCE_SECONDS = 300
 
-def sign_payload(secret: str, payload: dict, timestamp: int):
-    """
-    Sign a webhook payload using HMAC-SHA256.
-
-    :param secret: The shared secret key
-    :param payload: The payload as a dict
-    :param timestamp: The Unix timestamp of the request
-    :return: The hex signature prefixed with 'sha256='
-    """
-
-    dumped_payload = json.dumps(
-        payload, 
-        separators=(',', ':'), 
-        sort_keys=True,
-    )
-
-    message = f"{timestamp}.{dumped_payload}"
-    signature = hmac.new(
-        secret.encode(),
-        message.encode(),
-        hashlib.sha256
-    ).hexdigest()
-
-    return f"{SIGNATURE_PREFIX}{signature}"
-
-def verify_signature(secret: str, payload: dict, signature_header, timestamp_header):
+def verify_signature(secret: str, raw_body: bytes, signature_header: str, timestamp_header: str):
     """
     Verify a webhook signature and reject stale requests.
 
-    :param secret: The shared secret key
-    :param payload: The raw payload as a dict
+    :param secret: The auth token of the webhook
+    :param raw_body: The request body, as received (bytes)
     :param signature_header: The value of X-Webhook-Signature
     :param timestamp_header: The value of X-Webhook-Timestamp
     :raises ValueError: If the timestamp is stale or the signature is invalid
     """
-    request_time = int(timestamp_header)
-    if abs(time.time() - request_time) > TIMESTAMP_TOLERANCE_SECONDS:
+    if abs(time.time() - int(timestamp_header)) > TIMESTAMP_TOLERANCE_SECONDS:
         raise ValueError("Request timestamp is too old")
 
-    expected = sign_payload(secret, payload, timestamp_header)
+    message = timestamp_header.encode() + b"." + raw_body
+    expected = SIGNATURE_PREFIX + hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
 
     if not hmac.compare_digest(expected, signature_header):
         raise ValueError("Invalid signature")
     `} 
     lang="python" 
-    title={"hmac.py"} 
+    title={"verify.py"} 
 />
+  </TabItem>
+  <TabItem label="JavaScript">
+<Code 
+    code={`
+const crypto = require("crypto");
+
+const SIGNATURE_PREFIX = "sha256=";
+const TIMESTAMP_TOLERANCE_SECONDS = 300;
+
+/**
+ * Verify a webhook signature and reject stale requests.
+ * @param {string} secret The auth token of the webhook
+ * @param {Buffer} rawBody The request body, as received
+ * @param {string} signatureHeader The value of X-Webhook-Signature
+ * @param {string} timestampHeader The value of X-Webhook-Timestamp
+ * @returns {boolean} True if the request comes from Barestho
+ */
+function verifySignature(secret, rawBody, signatureHeader, timestampHeader) {
+    const age = Math.abs(Date.now() / 1000 - Number(timestampHeader));
+    if (age > TIMESTAMP_TOLERANCE_SECONDS) {
+        return false;
+    }
+
+    const message = Buffer.concat([Buffer.from(timestampHeader + "."), rawBody]);
+    const expected = SIGNATURE_PREFIX + crypto.createHmac("sha256", secret).update(message).digest("hex");
+
+    return expected.length === signatureHeader.length
+        && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signatureHeader));
+}
+    `} 
+    lang="js" 
+    title={"verify.js"} 
+/>
+  </TabItem>
+  <TabItem label="Java">
+<Code 
+    code={`
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.time.Instant;
+import java.util.HexFormat;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+public final class WebhookSignature {
+
+    private static final String SIGNATURE_PREFIX = "sha256=";
+    private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final long TIMESTAMP_TOLERANCE_SECONDS = 300;
+
+    private WebhookSignature() {
+    }
+
+    /**
+     * Verify a webhook signature and reject stale requests. Needs Java 17+.
+     *
+     * @param secret The auth token of the webhook
+     * @param rawBody The request body, as received
+     * @param signatureHeader The value of X-Webhook-Signature
+     * @param timestampHeader The value of X-Webhook-Timestamp
+     * @return True if the request comes from Barestho
+     */
+    public static boolean verify(String secret, byte[] rawBody, String signatureHeader, String timestampHeader)
+            throws GeneralSecurityException {
+        long timestamp;
+        try {
+            timestamp = Long.parseLong(timestampHeader);
+        } catch (NumberFormatException exception) {
+            return false;
+        }
+        if (Math.abs(Instant.now().getEpochSecond() - timestamp) > TIMESTAMP_TOLERANCE_SECONDS) {
+            return false;
+        }
+
+        Mac mac = Mac.getInstance(HMAC_ALGORITHM);
+        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM));
+        mac.update((timestampHeader + ".").getBytes(StandardCharsets.UTF_8));
+        String expected = SIGNATURE_PREFIX + HexFormat.of().formatHex(mac.doFinal(rawBody));
+
+        return signatureHeader != null && MessageDigest.isEqual(
+            expected.getBytes(StandardCharsets.UTF_8),
+            signatureHeader.getBytes(StandardCharsets.UTF_8)
+        );
+    }
+}
+    `} 
+    lang="java" 
+    title={"WebhookSignature.java"} 
+/>
+  </TabItem>
+  <TabItem label="C#">
+<Code 
+    code={`
+using System;
+using System.Security.Cryptography;
+using System.Text;
+
+public static class WebhookSignature
+{
+    private const string SignaturePrefix = "sha256=";
+    private const long TimestampToleranceSeconds = 300;
+
+    /// <summary>Verify a webhook signature and reject stale requests. Needs .NET 6+.</summary>
+    /// <param name="secret">The auth token of the webhook</param>
+    /// <param name="rawBody">The request body, as received</param>
+    /// <param name="signatureHeader">The value of X-Webhook-Signature</param>
+    /// <param name="timestampHeader">The value of X-Webhook-Timestamp</param>
+    /// <returns>True if the request comes from Barestho</returns>
+    public static bool Verify(string secret, byte[] rawBody, string signatureHeader, string timestampHeader)
+    {
+        if (!long.TryParse(timestampHeader, out var timestamp))
+        {
+            return false;
+        }
+        if (Math.Abs(DateTimeOffset.UtcNow.ToUnixTimeSeconds() - timestamp) > TimestampToleranceSeconds)
+        {
+            return false;
+        }
+
+        var prefix = Encoding.UTF8.GetBytes(timestampHeader + ".");
+        var message = new byte[prefix.Length + rawBody.Length];
+        prefix.CopyTo(message, 0);
+        rawBody.CopyTo(message, prefix.Length);
+
+        var digest = HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), message);
+        var expected = SignaturePrefix + Convert.ToHexString(digest).ToLowerInvariant();
+
+        return signatureHeader != null && CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(expected),
+            Encoding.UTF8.GetBytes(signatureHeader)
+        );
+    }
+}
+    `} 
+    lang="csharp" 
+    title={"WebhookSignature.cs"} 
+/>
+  </TabItem>
+  <TabItem label="Ruby">
+<Code 
+    code={`
+require "openssl"
+
+SIGNATURE_PREFIX = "sha256="
+TIMESTAMP_TOLERANCE_SECONDS = 300
+DECIMAL_BASE = 10
+
+# Verify a webhook signature and reject stale requests. Needs Ruby 3.0+.
+#
+# @param secret [String] The auth token of the webhook
+# @param raw_body [String] The request body, as received (e.g. request.raw_post in Rails)
+# @param signature_header [String] The value of X-Webhook-Signature
+# @param timestamp_header [String] The value of X-Webhook-Timestamp
+# @return [Boolean] True if the request comes from Barestho
+def verify_signature(secret, raw_body, signature_header, timestamp_header)
+  timestamp = Integer(timestamp_header, DECIMAL_BASE, exception: false)
+  return false if timestamp.nil? || signature_header.nil?
+  return false if (Time.now.to_i - timestamp).abs > TIMESTAMP_TOLERANCE_SECONDS
+
+  message = "#{timestamp_header}.".b + raw_body.b
+  expected = SIGNATURE_PREFIX + OpenSSL::HMAC.hexdigest("SHA256", secret, message)
+
+  OpenSSL.secure_compare(expected, signature_header)
+end
+    `} 
+    lang="ruby" 
+    title={"verify.rb"} 
+/>
+  </TabItem>
+  <TabItem label="PHP">
+<Code 
+    code={`
+<?php
+
+const SIGNATURE_PREFIX = 'sha256=';
+const TIMESTAMP_TOLERANCE_SECONDS = 300;
+
+/**
+ * Verify a webhook signature and reject stale requests. Needs PHP 7.4+.
+ *
+ * @param string $secret The auth token of the webhook
+ * @param string $rawBody The request body, as received: file_get_contents('php://input')
+ * @param string|null $signatureHeader The value of X-Webhook-Signature
+ * @param string|null $timestampHeader The value of X-Webhook-Timestamp
+ * @return bool True if the request comes from Barestho
+ */
+function verifySignature(string $secret, string $rawBody, ?string $signatureHeader, ?string $timestampHeader): bool
+{
+    if ($signatureHeader === null || $timestampHeader === null || !ctype_digit($timestampHeader)) {
+        return false;
+    }
+    if (abs(time() - (int) $timestampHeader) > TIMESTAMP_TOLERANCE_SECONDS) {
+        return false;
+    }
+
+    $expected = SIGNATURE_PREFIX . hash_hmac('sha256', $timestampHeader . '.' . $rawBody, $secret);
+
+    return hash_equals($expected, $signatureHeader);
+}
+    `} 
+    lang="php" 
+    title={"verify.php"} 
+/>
+  </TabItem>
+  <TabItem label="Go">
+<Code 
+    code={`
+package webhook
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"strconv"
+	"time"
+)
+
+const (
+	signaturePrefix           = "sha256="
+	timestampToleranceSeconds = 300
+	decimalBase               = 10
+	int64BitSize              = 64
+)
+
+// VerifySignature verifies a webhook signature and rejects stale requests.
+//
+// secret is the auth token of the webhook, rawBody the request body as received
+// (io.ReadAll(r.Body)), signatureHeader the value of X-Webhook-Signature and
+// timestampHeader the value of X-Webhook-Timestamp. It returns true if the
+// request comes from Barestho.
+func VerifySignature(secret string, rawBody []byte, signatureHeader, timestampHeader string) bool {
+	timestamp, err := strconv.ParseInt(timestampHeader, decimalBase, int64BitSize)
+	if err != nil {
+		return false
+	}
+	age := time.Now().Unix() - timestamp
+	if age > timestampToleranceSeconds || age < -timestampToleranceSeconds {
+		return false
+	}
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(timestampHeader + "."))
+	mac.Write(rawBody)
+	expected := signaturePrefix + hex.EncodeToString(mac.Sum(nil))
+
+	return hmac.Equal([]byte(expected), []byte(signatureHeader))
+}
+    `} 
+    lang="go" 
+    title={"verify.go"} 
+/>
+  </TabItem>
+</Tabs>
 
 ## Delivery and Retries
 
-Your server must answer with a `2xx` status within **10 seconds**. Any other answer is a failure: another status, a timeout, a connection error, or a redirection (redirections are not followed).
+Your server must answer with a `2xx` status within **10 seconds**. Any other answer is a failure: another status, a timeout, a connection error, or a redirection (redirections are not followed). Barestho reads at most the first 10,000 bytes of the body, for at most 15 seconds in total, then closes the connection.
 
 A failed request is sent again automatically, up to **8 attempts** in total. Each retry waits after the previous attempt:
 
@@ -191,7 +464,7 @@ GET /api/v1/partnership/webhooks/:uuid/requests/:request_uuid/
 | `PENDING` | Automatic attempts are left. See `next_attempt_at` |
 | `FAILED` | The 8 attempts failed. No automatic attempt is left |
 
-Each request shows its `attempts` and the response of your server to the last attempt: `last_response_status_code` and `last_response`. The body is cut to 10,000 characters.
+Each request shows its `attempts` and the response of your server to the last attempt: `last_response_status_code` and `last_response`. The body is cut to 10,000 bytes.
 
 ### Manual Retry
 
@@ -205,5 +478,5 @@ PATCH /api/v1/partnership/webhooks/:uuid/requests/:request_uuid/?action=retry
 - `200`: your server failed again. The body is the request with this attempt recorded.
 - `409 WEBHOOK_DISABLED`: the webhook or your partner account is disabled. Enable it first.
 
-The call waits for your server, up to 10 seconds. A retry of a `PENDING` request counts as an attempt. A retry of a `FAILED` request does not change `attempts`.
+The call waits for your server, up to 10 seconds. A manual retry is never counted: `attempts` does not change. A `PENDING` request keeps its automatic attempts, the next one computed from this retry. A `FAILED` request gets no automatic attempt.
 
