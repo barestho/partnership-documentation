@@ -2,7 +2,7 @@ FROM node:lts-trixie-slim AS base
 
 COPY . /documentation
 
-RUN corepack enable pnpm \
+RUN npm install -g pnpm \
     && yes | pnpm -v 
 
 FROM base AS development
