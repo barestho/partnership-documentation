@@ -57,7 +57,7 @@ export default defineConfig({
 						en: "Guides",
 						nl: "Gidsen",
 					},
-					autogenerate: { directory: 'guides' },
+					items: [{ autogenerate: { "directory": "guides" } }]
 				},
 				...openAPISidebarGroups,
 			],
