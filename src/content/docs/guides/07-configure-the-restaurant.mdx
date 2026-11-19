@@ -117,7 +117,7 @@ DELETE /api/v1/partnership/restaurants/:restaurant_id/opening-hours/:id/
 | `from_hour` | Opening time, `HH:MM:SS` |
 | `to_hour` | Closing time, `HH:MM:SS`. Must be after `from_hour` |
 
-A day can have several ranges, e.g. lunch and dinner. The list is sorted by `weekday`, then `from_hour`. Filter it with `?weekday=`.
+A day can have several ranges, e.g. lunch and dinner. The list is sorted by `weekday`, then `from_hour`. Filter it with `?weekday=`, sort it with `?ordering=weekday`, `from_hour` or `id`.
 
 <Aside type="caution">
 **Local time, not UTC.** The opening hours repeat every week: they are in the local time of the restaurant (see its `timezone`), unlike the other dates and times of the API. `19:00:00` stays 19:00 in summer and in winter.
@@ -150,7 +150,7 @@ DELETE /api/v1/partnership/restaurants/:restaurant_id/closed-days/:id/
 | `from_day` | First closed day, `YYYY-MM-DD`. Required |
 | `to_day` | Last closed day, included, `YYYY-MM-DD`. Required. For a single day, set it to `from_day` |
 
-The days are days of the restaurant calendar. The list is sorted by `from_day`. Get the current and coming closings with `?to_day__gte=<today>`; `?from_day__lte=` is available too.
+The days are days of the restaurant calendar. The list is sorted by `from_day`; sort it with `?ordering=from_day`, `to_day` or `id`. Get the current and coming closings with `?to_day__gte=<today>`; `?from_day__lte=` is available too.
 
 <Aside type="caution">
 Closing days does not cancel the reservations already taken on these days: they stay. Read them with the [reservations](/partnership-documentation/guides/05-manage-reservations#list-reservations) filters, e.g. `?start_time__date__gte=2026-12-24&start_time__date__lte=2026-12-26`, and cancel them if needed.
