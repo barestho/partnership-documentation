@@ -129,3 +129,37 @@ A day can have several ranges, e.g. lunch and dinner. The list is sorted by `wee
 - `DELETE` removes the range for good and answers `204`.
 - The creations accept an `Idempotency-Key` header.
 
+## Closed Days
+
+Closed days are the exceptional closings of the restaurant: holidays, works, private events… No new reservation can be made on these days: the [availabilities](/partnership-documentation/guides/06-read-availabilities) list no slot, and Google is updated too.
+
+```
+GET    /api/v1/partnership/restaurants/:restaurant_id/closed-days/
+POST   /api/v1/partnership/restaurants/:restaurant_id/closed-days/
+GET    /api/v1/partnership/restaurants/:restaurant_id/closed-days/:id/
+PATCH  /api/v1/partnership/restaurants/:restaurant_id/closed-days/:id/
+DELETE /api/v1/partnership/restaurants/:restaurant_id/closed-days/:id/
+```
+
+```json
+{ "id": 12, "from_day": "2026-12-24", "to_day": "2026-12-26" }
+```
+
+| Field | Content |
+|---|---|
+| `from_day` | First closed day, `YYYY-MM-DD`. Required |
+| `to_day` | Last closed day, included, `YYYY-MM-DD`. Required. For a single day, set it to `from_day` |
+
+The days are days of the restaurant calendar. The list is sorted by `from_day`. Get the current and coming closings with `?to_day__gte=<today>`; `?from_day__lte=` is available too.
+
+<Aside type="caution">
+Closing days does not cancel the reservations already taken on these days: they stay. Read them with the [reservations](/partnership-documentation/guides/05-manage-reservations#list-reservations) filters, e.g. `?start_time__date__gte=2026-12-24&start_time__date__lte=2026-12-26`, and cancel them if needed.
+</Aside>
+
+- `from_day` must be before or on `to_day`.
+- A closing cannot end before today (in the calendar of the restaurant): it would have no effect.
+- Two closings cannot share a day: change the existing one instead.
+- Otherwise: `400 VALIDATION_ERROR`, with a `message` that names the overlapping closing.
+- `DELETE` removes the closing for good, opens the days again, and answers `204`. A past closing can be deleted.
+- The creations accept an `Idempotency-Key` header.
+

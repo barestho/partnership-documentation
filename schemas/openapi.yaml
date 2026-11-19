@@ -929,6 +929,200 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 
+  /api/v1/partnership/restaurants/{restaurant_pk}/closed-days/:
+    get:
+      operationId: restaurants_closed_days_list
+      summary: List a restaurant's closed days
+      description: >
+        Returns the exceptional closings of the restaurant, sorted by `from_day`. No new
+        reservation can be made on these days; the reservations already taken stay.
+
+        **Required scope:** none, any access granted by the restaurant.
+      parameters:
+        - $ref: '#/components/parameters/RestaurantPk'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - name: to_day__gte
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Closings ending on this day or later, e.g. today for the current and coming ones.
+        - name: from_day__lte
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Closings starting on this day or earlier.
+        - name: ordering
+          in: query
+          required: false
+          description: 'Sort field, `-` prefix for descending. Default: `from_day`. Also `to_day`, `id`.'
+          schema:
+            type: string
+      tags:
+        - Restaurant settings
+      responses:
+        '200':
+          description: A paginated list of closed days.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PartnerClosedDays'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    post:
+      operationId: restaurants_closed_days_create
+      summary: Create closed days
+      description: >
+        A closing cannot end before today, nor share a day with another closing.
+
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+        Accepts an `Idempotency-Key` header.
+      parameters:
+        - $ref: '#/components/parameters/RestaurantPk'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      tags:
+        - Restaurant settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerClosedDays'
+      responses:
+        '201':
+          description: The new closed days.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerClosedDays'
+        '400':
+          description: >
+            `VALIDATION_ERROR`: a day is missing, `from_day` is after `to_day`, the closing
+            ends before today, or it shares a day with another closing (named in `message`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '409':
+          $ref: '#/components/responses/IdempotencyKeyInProgress'
+
+  /api/v1/partnership/restaurants/{restaurant_pk}/closed-days/{id}/:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantPk'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: restaurants_closed_days_retrieve
+      summary: Retrieve closed days
+      description: >
+        **Required scope:** none, any access granted by the restaurant.
+      tags:
+        - Restaurant settings
+      responses:
+        '200':
+          description: The closed days.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerClosedDays'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    patch:
+      operationId: restaurants_closed_days_partial_update
+      summary: Update closed days
+      description: >
+        Send only the fields to change. Same checks as at the creation.
+
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+      tags:
+        - Restaurant settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerClosedDays'
+      responses:
+        '200':
+          description: The updated closed days.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerClosedDays'
+        '400':
+          description: >
+            `VALIDATION_ERROR`: a day is missing, `from_day` is after `to_day`, the closing
+            ends before today, or it shares a day with another closing (named in `message`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    delete:
+      operationId: restaurants_closed_days_destroy
+      summary: Delete closed days
+      description: >
+        Deletes the closing for good: the days are open again. A past closing can be deleted.
+
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+      tags:
+        - Restaurant settings
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
   /api/v1/partnership/restaurants/{restaurant_pk}/zones/:
     get:
       operationId: restaurants_zones_list
@@ -3184,6 +3378,31 @@ components:
         created_at: '2026-05-01T08:00:00Z'
         updated_at: '2026-05-01T08:00:00Z'
 
+    # -------------------------------------------------------------------------
+    # PartnerClosedDays
+    # -------------------------------------------------------------------------
+    PartnerClosedDays:
+      type: object
+      description: An exceptional closing of the restaurant, both days included.
+      required:
+        - from_day
+        - to_day
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        from_day:
+          type: string
+          format: date
+          description: First closed day.
+        to_day:
+          type: string
+          format: date
+          description: Last closed day, included. Same as `from_day` for a single day.
+      example:
+        id: 12
+        from_day: '2026-12-24'
+        to_day: '2026-12-26'
     # -------------------------------------------------------------------------
     # PartnerOpeningHours
     # -------------------------------------------------------------------------
