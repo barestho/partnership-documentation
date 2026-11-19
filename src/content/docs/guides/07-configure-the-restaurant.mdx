@@ -97,7 +97,7 @@ Send `special_option_ids` when you [create](/partnership-documentation/guides/05
 
 ## Opening Hours
 
-The opening hours tell the guests when the restaurant is open. They are shown in the booking widget only: **they do not change the availabilities**, which come from the services of the restaurant.
+The opening hours tell the guests when the restaurant is open. They are shown in the booking widget only: **they do not change the availabilities**, which come from the [shifts](#shifts) of the restaurant.
 
 ```
 GET    /api/v1/partnership/restaurants/:restaurant_id/opening-hours/
@@ -162,4 +162,141 @@ Closing days does not cancel the reservations already taken on these days: they 
 - Otherwise: `400 VALIDATION_ERROR`, with a `message` that names the overlapping closing.
 - `DELETE` removes the closing for good, opens the days again, and answers `204`. A past closing can be deleted.
 - The creations accept an `Idempotency-Key` header.
+
+## Shifts
+
+Shifts are the services of the restaurant: lunch, dinner… They set **when guests can book**, for how many guests, and until when. The [availabilities](/partnership-documentation/guides/06-read-availabilities) come from them: a time with no shift has no slot.
+
+```
+GET    /api/v1/partnership/restaurants/:restaurant_id/shifts/
+POST   /api/v1/partnership/restaurants/:restaurant_id/shifts/
+GET    /api/v1/partnership/restaurants/:restaurant_id/shifts/:id/
+PATCH  /api/v1/partnership/restaurants/:restaurant_id/shifts/:id/
+DELETE /api/v1/partnership/restaurants/:restaurant_id/shifts/:id/
+```
+
+### Kinds of Shifts
+
+| `kind` | What it is | Created with |
+|---|---|---|
+| `WEEKLY` | Repeats every week on its `weekday` | `weekday`, `from_hour`, `to_hour`, no `date` |
+| `EXCEPTION` | Replaces a weekly shift on one `date`: other hours, other limits, or closed that day with `"active": false` | `date` and `replaces_shift_id` (a weekly shift) |
+| `SPECIAL_OPENING` | Opens the restaurant on one `date`, without replacing a weekly shift | `date`, `from_hour`, `to_hour`, no `replaces_shift_id` |
+
+The `kind` is read-only: it follows `date` and `replaces_shift_id` at the creation, and never changes.
+
+### Fields
+
+```json
+{
+    "id": 6,
+    "kind": "WEEKLY",
+    "date": null,
+    "replaces_shift_id": null,
+    "weekday": 3,
+    "from_hour": "18:00:00",
+    "to_hour": "21:30:00",
+    "active": true,
+    "interval": 30,
+    "min_seats": 1,
+    "max_seats": 16,
+    "shift_limit_active": false,
+    "shift_seats_limit": 16,
+    "interval_limit_active": false,
+    "interval_seats_limit": 1,
+    "message": null,
+    "show_message": false,
+    "override_before_service": false,
+    "duration_before_service": false,
+    "reservation_before_duration": "01:00:00",
+    "show_call_option": true,
+    "show_call_option_on_limit_reached": true,
+    "created_at": "2026-03-27T16:29:46.462481Z",
+    "updated_at": "2026-03-27T16:29:46.462539Z"
+}
+```
+
+| Field | Content |
+|---|---|
+| `kind` | `WEEKLY`, `EXCEPTION` or `SPECIAL_OPENING`. Read-only |
+| `date` | Day of an exception or a special opening, `YYYY-MM-DD`. `null` for a weekly shift |
+| `replaces_shift_id` | Weekly shift an exception replaces. `null` for the other kinds |
+| `weekday` | `0` is Monday, `6` is Sunday. Given by the `date` for a dated shift |
+| `from_hour`, `to_hour` | Start and end of the service, `HH:MM:SS`, local time. `from_hour` must be before `to_hour` |
+| `active` | An inactive shift takes no booking. An inactive exception closes its weekly shift on that day |
+| `interval` | Minutes between two bookable times: `15`, `30` or `60` |
+| `min_seats`, `max_seats` | Smallest and biggest party size that can book. `min_seats` up to `max_seats` |
+| `shift_limit_active`, `shift_seats_limit` | When active: at most this many guests over the whole shift |
+| `interval_limit_active`, `interval_seats_limit` | When active: at most this many guests per bookable time |
+| `message`, `show_message` | Message shown to the guests in the booking widget, up to 255 characters, when `show_message` is `true` |
+| `override_before_service` | Use the booking deadline below instead of the one of the restaurant |
+| `reservation_before_duration` | Booking deadline: bookings close this long before the time, as `HH:MM:SS` (`1 00:00:00` from 24 hours) |
+| `duration_before_service` | The deadline counts from the start of the service, instead of from each bookable time |
+| `show_call_option` | The booking widget offers to call the restaurant |
+| `show_call_option_on_limit_reached` | The booking widget offers to call the restaurant when a limit is reached |
+
+<Aside type="caution">
+**Local time, not UTC.** Like the opening hours, `from_hour`, `to_hour`, `date` and `weekday` are in the local time of the restaurant (see its `timezone`). `created_at` and `updated_at` are in UTC.
+</Aside>
+
+### List Shifts
+
+The list holds the weekly shifts and the dated shifts **from today** (in the calendar of the restaurant). With a date filter, it holds the past dated shifts too. A shift is always reachable by its `id`.
+
+| Filter | Content |
+|---|---|
+| `?kind=` | `WEEKLY`, `EXCEPTION` or `SPECIAL_OPENING` |
+| `?weekday=` | Day of the week |
+| `?active=` | `true` or `false` |
+| `?date=`, `?date__gte=`, `?date__lte=` | Day of the dated shifts, `YYYY-MM-DD` |
+
+The list is sorted by `date`, `weekday`, then `from_hour`: the weekly shifts come after the dated ones. Sort it with `?ordering=date`, `weekday`, `from_hour` or `id`.
+
+### Create a Shift
+
+```json
+POST /api/v1/partnership/restaurants/:restaurant_id/shifts/
+
+{ "weekday": 4, "from_hour": "12:00:00", "to_hour": "14:30:00", "max_seats": 8 }
+```
+
+An exception only needs its `date` and the shift it replaces: the hours, the interval and the party sizes you do not send are taken from the replaced shift. To close a weekly shift on one day:
+
+```json
+{ "date": "2026-12-24", "replaces_shift_id": 6, "active": false }
+```
+
+A special opening needs its `date` and its hours:
+
+```json
+{ "date": "2026-12-27", "from_hour": "12:00:00", "to_hour": "15:00:00" }
+```
+
+The other fields take their default values. The creations accept an `Idempotency-Key` header.
+
+### Rules
+
+All of them answer `400 VALIDATION_ERROR`, with a `message`:
+
+- `from_hour` must be before `to_hour`: a shift cannot go past midnight. Create one shift on each day instead.
+- `min_seats` must be up to `max_seats`.
+- Two weekly shifts of the same day cannot overlap.
+- A dated shift cannot overlap the weekly shifts of its day, except the one it replaces, nor the other dated shifts of its date. The `message` names the overlapping shift.
+- `replaces_shift_id` must be a weekly shift, and the `date` must be on its weekday. A `weekday` sent with a `date` must agree with it.
+- A weekly shift has one exception per date at most.
+- A `date` cannot be before today.
+- `replaces_shift_id` needs a `date`.
+- The `date` and `replaces_shift_id` of a shift cannot change, and a weekly shift cannot get a date: create a new shift instead.
+- The `weekday` of a weekly shift with exceptions cannot change: their dates would no longer match.
+
+### Delete a Shift
+
+`DELETE` answers `204`.
+
+- An exception or a special opening is removed: on its date, the weekly shifts apply again.
+- A weekly shift disappears from the list and takes no more booking. If it has exceptions, they stay and keep replacing it on their dates.
+
+<Aside type="note">
+The [closed days](#closed-days) win over the shifts: no shift opens a closed day.
+</Aside>
 

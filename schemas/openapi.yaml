@@ -1123,6 +1123,241 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 
+  /api/v1/partnership/restaurants/{restaurant_pk}/shifts/:
+    get:
+      operationId: restaurants_shifts_list
+      summary: List a restaurant's shifts
+      description: >
+        Returns the weekly shifts and the dated shifts (exceptions and special openings) from
+        today, in the calendar of the restaurant. With a `date` filter, the past dated shifts
+        are listed too. Hours and dates are local to the restaurant.
+
+        **Required scope:** none, any access granted by the restaurant.
+      parameters:
+        - $ref: '#/components/parameters/RestaurantPk'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - name: kind
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [WEEKLY, EXCEPTION, SPECIAL_OPENING]
+        - name: weekday
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 6
+          description: Day of the week, `0` is Monday.
+        - name: active
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Dated shifts of this day.
+        - name: date__gte
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Dated shifts on this day or later.
+        - name: date__lte
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Dated shifts on this day or earlier.
+        - name: ordering
+          in: query
+          required: false
+          description: 'Sort field, `-` prefix for descending. Default: `date,weekday,from_hour` (weekly shifts last). Also `id`.'
+          schema:
+            type: string
+      tags:
+        - Restaurant settings
+      responses:
+        '200':
+          description: A paginated list of shifts.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PartnerShift'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    post:
+      operationId: restaurants_shifts_create
+      summary: Create a shift
+      description: >
+        The kind follows the body: without `date`, a weekly shift (`weekday`, `from_hour`
+        and `to_hour` required). With `date` and `replaces_shift_id`, an exception: the
+        hours, the interval and the party sizes not sent are taken from the replaced shift.
+        With `date` only, a special opening (`from_hour` and `to_hour` required).
+
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+        Accepts an `Idempotency-Key` header.
+      parameters:
+        - $ref: '#/components/parameters/RestaurantPk'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      tags:
+        - Restaurant settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerShift'
+      responses:
+        '201':
+          description: The new shift.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerShift'
+        '400':
+          description: >
+            `VALIDATION_ERROR`: hours or party sizes out of order, an overlap with another
+            shift (named in `message`), a `date` before today or off the weekday of the
+            replaced shift, a second exception of the shift on the date, a missing field of
+            the kind, or a change of `date`, `replaces_shift_id`, or of the `weekday` of a
+            weekly shift with exceptions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '409':
+          $ref: '#/components/responses/IdempotencyKeyInProgress'
+
+  /api/v1/partnership/restaurants/{restaurant_pk}/shifts/{id}/:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantPk'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: restaurants_shifts_retrieve
+      summary: Retrieve a shift
+      description: >
+        Any weekly or dated shift, past ones included.
+
+        **Required scope:** none, any access granted by the restaurant.
+      tags:
+        - Restaurant settings
+      responses:
+        '200':
+          description: The shift.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerShift'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    patch:
+      operationId: restaurants_shifts_partial_update
+      summary: Update a shift
+      description: >
+        Send only the fields to change. Same checks as at the creation. The `date` and
+        `replaces_shift_id` cannot change, and the `weekday` of a weekly shift with
+        exceptions neither.
+
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+      tags:
+        - Restaurant settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PartnerShift'
+      responses:
+        '200':
+          description: The updated shift.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerShift'
+        '400':
+          description: >
+            `VALIDATION_ERROR`: hours or party sizes out of order, an overlap with another
+            shift (named in `message`), a `date` before today or off the weekday of the
+            replaced shift, a second exception of the shift on the date, a missing field of
+            the kind, or a change of `date`, `replaces_shift_id`, or of the `weekday` of a
+            weekly shift with exceptions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    delete:
+      operationId: restaurants_shifts_destroy
+      summary: Delete a shift
+      description: >
+        A dated shift is removed: the weekly shifts apply again on its date. A weekly shift
+        leaves the list and takes no more booking; its exceptions stay on their dates.
+
+        **Required scope:** `restaurant:manage`, with a read and write API key.
+      tags:
+        - Restaurant settings
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/AuthenticationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
   /api/v1/partnership/restaurants/{restaurant_pk}/zones/:
     get:
       operationId: restaurants_zones_list
@@ -3403,6 +3638,137 @@ components:
         id: 12
         from_day: '2026-12-24'
         to_day: '2026-12-26'
+    # -------------------------------------------------------------------------
+    # PartnerShift
+    # -------------------------------------------------------------------------
+    PartnerShift:
+      type: object
+      description: >
+        A service of the restaurant, in its local time: weekly, an exception replacing a
+        weekly shift on one date, or a special opening on one date.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        kind:
+          type: string
+          enum: [WEEKLY, EXCEPTION, SPECIAL_OPENING]
+          readOnly: true
+          description: Follows `date` and `replaces_shift_id` at the creation, never changes.
+        date:
+          type: string
+          format: date
+          nullable: true
+          description: Day of an exception or a special opening, not before today. `null` for a weekly shift.
+        replaces_shift_id:
+          type: integer
+          nullable: true
+          description: Weekly shift an exception replaces on its `date`. `null` for the other kinds.
+        weekday:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: '`0` is Monday. Given by the `date` for a dated shift.'
+        from_hour:
+          type: string
+          example: '18:00:00'
+          description: Start of the service, `HH:MM:SS`, local time. Before `to_hour`.
+        to_hour:
+          type: string
+          example: '21:30:00'
+          description: End of the service, `HH:MM:SS`, local time.
+        active:
+          type: boolean
+          default: true
+          description: An inactive shift takes no booking. An inactive exception closes its weekly shift that day.
+        interval:
+          type: integer
+          enum: [15, 30, 60]
+          default: 30
+          description: Minutes between two bookable times.
+        min_seats:
+          type: integer
+          default: 1
+          description: Smallest party size. Up to `max_seats`.
+        max_seats:
+          type: integer
+          default: 16
+          description: Biggest party size.
+        shift_limit_active:
+          type: boolean
+          default: false
+        shift_seats_limit:
+          type: integer
+          minimum: 1
+          description: When `shift_limit_active`, at most this many guests over the whole shift.
+        interval_limit_active:
+          type: boolean
+          default: false
+        interval_seats_limit:
+          type: integer
+          minimum: 1
+          description: When `interval_limit_active`, at most this many guests per bookable time.
+        message:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Message shown to the guests in the booking widget when `show_message`.
+        show_message:
+          type: boolean
+          default: false
+        override_before_service:
+          type: boolean
+          default: false
+          description: Use `reservation_before_duration` and `duration_before_service` instead of the ones of the restaurant.
+        duration_before_service:
+          type: boolean
+          default: false
+          description: The deadline counts from the start of the service, instead of from each bookable time.
+        reservation_before_duration:
+          type: string
+          example: '01:00:00'
+          description: Booking deadline, as `HH:MM:SS` (`1 00:00:00` from 24 hours).
+        show_call_option:
+          type: boolean
+          default: true
+          description: The booking widget offers to call the restaurant.
+        show_call_option_on_limit_reached:
+          type: boolean
+          default: true
+          description: The booking widget offers to call the restaurant when a limit is reached.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      example:
+        id: 6
+        kind: WEEKLY
+        date: null
+        replaces_shift_id: null
+        weekday: 3
+        from_hour: '18:00:00'
+        to_hour: '21:30:00'
+        active: true
+        interval: 30
+        min_seats: 1
+        max_seats: 16
+        shift_limit_active: false
+        shift_seats_limit: 16
+        interval_limit_active: false
+        interval_seats_limit: 1
+        message: null
+        show_message: false
+        override_before_service: false
+        duration_before_service: false
+        reservation_before_duration: '01:00:00'
+        show_call_option: true
+        show_call_option_on_limit_reached: true
+        created_at: '2026-03-27T16:29:46.462481Z'
+        updated_at: '2026-03-27T16:29:46.462539Z'
     # -------------------------------------------------------------------------
     # PartnerOpeningHours
     # -------------------------------------------------------------------------
